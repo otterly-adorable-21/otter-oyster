@@ -7,7 +7,6 @@ const nextConfig = {
     config.resolve.alias['@'] = path.join(here, 'src');
     return config;
   },
-  output: 'standalone',
   serverExternalPackages: ['sharp'],
   poweredByHeader: false,
   experimental: { serverActions: { bodySizeLimit: '40mb' } },

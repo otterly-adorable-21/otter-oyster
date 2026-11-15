@@ -18,5 +18,5 @@ export default async function Page({ params }: { params: Promise<{ handle: strin
   const c = getCreatorByHandle(handle);
   if (!c || c.suspended) notFound();
   const d = await loadPage(c);
-  return <CreatorPage d={d} path={`/${c.handle}`} background={c.isExample ? '/example/pond.webp' : undefined} />;
+  return <CreatorPage d={d} path={`/${c.handle}`} />;
 }

@@ -1,10 +1,10 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { getViewer } from '@/lib/auth';
+import { endSession, getViewer } from '@/lib/auth';
 import { assignTierRef } from '@/lib/gank';
 import {
-  createCreator, deletePost, getCreatorByUser, markVerified, saveTiers, savePost, setGankLink, setImageField, updateProfile, type TierInput,
+  createCreator, deleteAccount, deletePost, getCreatorByUser, markVerified, saveTiers, savePost, setGankLink, setImageField, updateProfile, type TierInput,
 } from '@/lib/creators';
 import { deleteImage, ImageError, saveImage, type ImageKind } from '@/lib/images';
 import { verifyCodeOnPage, VerifyError } from '@/lib/verify';
@@ -150,3 +150,14 @@ export async function rotateHookAction() {
   revalidatePath('/studio');
 }
 
+
+export async function deleteAccountAction(_p: Msg | null, form: FormData): Promise<Msg> {
+  const { v, creator } = await me();
+  if (creator && String(form.get('confirm') || '').trim().toLowerCase() !== creator.handle) {
+    return fail('Type your handle exactly to confirm.');
+  }
+  const files = deleteAccount(v.user.id);
+  for (const f of files) await deleteImage(f);
+  await endSession();
+  redirect('/');
+}

@@ -139,6 +139,8 @@ export function deleteAccount(userId: string): string[] {
       for (const p of postsOf(c.id)) if (p.imageFile) files.push(p.imageFile);
       // Posts first: a tier that still has posts is protected from deletion on purpose.
       run('DELETE FROM posts WHERE creatorId = ?', c.id);
+      // Payment notices include supporters' emails, so they go too.
+      run('DELETE FROM webhook_events WHERE creatorId = ?', c.id);
       run('DELETE FROM creators WHERE id = ?', c.id);
     }
     run('DELETE FROM users WHERE id = ?', userId);

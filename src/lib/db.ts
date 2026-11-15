@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS creators (
   mascotOn INTEGER NOT NULL DEFAULT 0, mascotLines TEXT NOT NULL DEFAULT 'Thanks for stopping by!',
   gankUrl TEXT NOT NULL DEFAULT '', gankNick TEXT NOT NULL DEFAULT '',
   gankVerified INTEGER NOT NULL DEFAULT 0, verifyCode TEXT NOT NULL,
-  tipUrl TEXT NOT NULL DEFAULT '', hookSecret TEXT NOT NULL UNIQUE,
+  tipUrl TEXT NOT NULL DEFAULT '', hookSecret TEXT NOT NULL UNIQUE, gankSigningKey TEXT NOT NULL DEFAULT '',
+  reviewNote TEXT NOT NULL DEFAULT '', reviewRequestedAt TEXT, reviewResult TEXT NOT NULL DEFAULT '',
   isExample INTEGER NOT NULL DEFAULT 0, suspended INTEGER NOT NULL DEFAULT 0,
   createdAt TEXT NOT NULL
 );
@@ -91,6 +92,13 @@ function open(): DatabaseSync {
   const d = new DatabaseSync(file);
   d.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   d.exec(SCHEMA);
+  // Upgrade older databases: add columns that were introduced later.
+  const cols = d.prepare('PRAGMA table_info(creators)').all() as { name: string }[];
+  const addCol = (name: string, def: string) => { if (!cols.some((c) => c.name === name)) d.exec(`ALTER TABLE creators ADD COLUMN ${name} ${def}`); };
+  addCol('gankSigningKey', "TEXT NOT NULL DEFAULT ''");
+  addCol('reviewNote', "TEXT NOT NULL DEFAULT ''");
+  addCol('reviewRequestedAt', 'TEXT');
+  addCol('reviewResult', "TEXT NOT NULL DEFAULT ''");
   return d;
 }
 
@@ -145,7 +153,7 @@ export interface CreatorRow {
   avatarFile: string | null; avatarShape: string; dividerKind: string; dividerFile: string | null;
   logoFile: string | null; bannerStatic: string | null; avatarStatic: string | null; logoStatic: string | null;
   mascotOn: number; mascotLines: string; gankUrl: string; gankNick: string; gankVerified: number;
-  verifyCode: string; tipUrl: string; hookSecret: string; isExample: number; suspended: number; createdAt: string;
+  verifyCode: string; tipUrl: string; hookSecret: string; gankSigningKey: string; reviewNote: string; reviewRequestedAt: string | null; reviewResult: string; isExample: number; suspended: number; createdAt: string;
 }
 export interface TierRow {
   id: string; creatorId: string; position: number; name: string; price: number;

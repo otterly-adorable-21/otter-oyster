@@ -75,7 +75,7 @@ function Post({ p, d, path }: { p: PostView; d: PageData; path: string }) {
 export function CreatorPage({ d, path, background }: { d: PageData; path: string; background?: string }) {
   const c = d.creator;
   const vars = themeVars(c.mainColor, c.accentColor) as CSSProperties;
-  const bannerUrl = fileUrl(c.bannerFile) ?? (c.isExample ? '/example/banner.webp' : null);
+  const bannerUrl = fileUrl(c.bannerFile) ?? (c.isExample ? '/example/pond.webp' : null);
   const avatarUrl = fileUrl(c.avatarFile) ?? (c.isExample ? '/example/otter.webp' : null);
   const logoUrl = fileUrl(c.logoFile) ?? (c.isExample ? '/example/wordmark.webp' : '/brand/oo-wordmark.webp');
   const divUrl = c.dividerKind === 'upload' ? fileUrl(c.dividerFile)

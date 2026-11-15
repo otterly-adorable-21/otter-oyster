@@ -23,8 +23,8 @@ export default function Terms() {
 
       <h2>3. Your account and your content</h2>
       <ul>
-        <li>You own your content. By posting it, you give us permission to store, display and deliver it on the site so the service works, including to your supporters. This permission ends when you delete the content or your account, apart from short-term backups.</li>
-        <li>You promise that you have the right to post what you post, that it follows the <Link href="/rules">Content rules</Link>.</li>
+        <li>You own your content. By posting it, you give us permission to store, display and deliver it on the site so the service works, including to your supporters. This permission ends when you delete the content or your account.</li>
+        <li>You promise that you have the right to post what you post, that it follows the <Link href="/rules">Content rules</Link>, and that any person shown in real photos or video is an adult who agreed to it.</li>
         <li>You are responsible for everything on your page, including AI-generated content, and for following the laws that apply to you, including tax and age-verification rules.</li>
         <li>Creators are responsible for any records the law requires them to keep about the people in their content.</li>
       </ul>
@@ -36,14 +36,14 @@ export default function Terms() {
       <p>We may remove or hide content, suspend a page, or close an account if it breaks these terms or the Content rules, if the law requires it, or if it puts people at risk. We may change or stop parts of the site. We try to give notice where we can, but we may act right away in serious cases.</p>
 
       <h2>6. Deleting your account</h2>
-      <p>Creators can delete their account in the studio. This permanently removes the page, tiers, posts, uploaded images and sign-in. Records of past payments are held by Gank, not by us.</p>
+      <p>Creators can delete their account in the studio. This permanently removes the page, tiers, posts, uploaded images and sign-in. The payment notices we stored for your page are deleted too. Gank keeps its own payment records under its own terms.</p>
 
       <h2>7. Copyright complaints</h2>
       <p>If you believe something on the site copies your work without permission, send us a report through the <Link href="/report">report form</Link>{CONTACT_EMAIL ? <> or at {CONTACT_EMAIL}</> : null}. Include what was copied, where it appears, and how to reach you. We may remove the content and tell the person who posted it.</p>
 
       <h2>8. Privacy</h2>
       <ul>
-        <li><strong>What we collect:</strong> your email address, a sign-in session (a cookie), the content you upload, and, for creators, the page details you enter. We store records of payment notifications from Gank (the supporter&apos;s email, the creator and tier, dates), so we can unlock the right posts.</li>
+        <li><strong>What we collect:</strong> your email address, a sign-in session (a cookie), the content you upload, and, for creators, the page details you enter. We store the payment notices Gank sends us (the supporter&apos;s email, the creator and tier, dates, and the rest of the notice), so we can unlock the right posts. If you send a report, we store it, along with your email if you give one.</li>
         <li><strong>Cookies:</strong> we use a sign-in cookie and small cookies that remember your age confirmation and your &quot;hide 18+ posts&quot; choice. We do not use advertising cookies.</li>
         <li><strong>What we do with it:</strong> run the site, unlock posts, send sign-in emails, prevent abuse, and answer reports. We do not sell your information.</li>
         <li><strong>Who sees it:</strong> email delivery and hosting services that help us run the site, and authorities when the law requires it. Creators do not see their supporters&apos; email addresses through this site.</li>

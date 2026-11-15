@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getViewer, isAdminEmail } from '@/lib/auth';
 import { all, run } from '@/lib/db';
+import { markVerified, pendingReviews, rejectReview } from '@/lib/creators';
+import { get } from '@/lib/db';
+import type { CreatorRow } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,12 +33,40 @@ async function suspend(form: FormData) {
   revalidatePath('/admin');
 }
 
+async function approve(form: FormData) {
+  'use server';
+  await guard();
+  const c = get<CreatorRow>('SELECT * FROM creators WHERE id = ? AND gankVerified = 2', String(form.get('id') || ''));
+  if (c) markVerified(c);
+  revalidatePath('/admin');
+}
+async function reject(form: FormData) {
+  'use server';
+  await guard();
+  rejectReview(String(form.get('id') || ''));
+  revalidatePath('/admin');
+}
+
 export default async function Admin() {
   await guard();
   const rows = all<{ id: string; postId: string | null; creatorHandle: string; reason: string; details: string; createdAt: string }>(
     "SELECT * FROM reports WHERE status = 'open' ORDER BY createdAt");
   return (
     <div style={{ maxWidth: 860, margin: '24px auto', padding: '0 16px', display: 'grid', gap: 12 }}>
+      <h1>Gank page reviews</h1>
+      <p className="hint">Open each Gank link in your browser. Approve only if you can see the creator&apos;s code in their bio.</p>
+      {pendingReviews().length === 0 && <p>No pages waiting.</p>}
+      {pendingReviews().map((c) => (
+        <div key={c.id} className="tier-ed">
+          <p><strong>{c.name}</strong> (@{c.handle})</p>
+          <p>Gank page: <a href={c.gankUrl} target="_blank" rel="noopener noreferrer">{c.gankUrl}</a></p>
+          <p>Code to look for: <code>{c.verifyCode}</code></p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <form action={approve}><input type="hidden" name="id" value={c.id} /><button className="btn btn-brand">Approve</button></form>
+            <form action={reject}><input type="hidden" name="id" value={c.id} /><button className="btn">Reject</button></form>
+          </div>
+        </div>
+      ))}
       <h1>Reports</h1>
       {rows.length === 0 && <p>No open reports.</p>}
       {rows.map((r) => (

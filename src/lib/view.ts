@@ -4,6 +4,7 @@ import { postState, tierRanks, viewerRank, type PostState } from './access';
 import { postsOf, tiersOf } from './creators';
 import type { CreatorRow, PostRow, TierRow } from './db';
 import { perksFromJson } from './validate';
+import { discordConfigured } from './discord';
 
 export interface PostView {
   id: string; title: string; date: string; nsfw: boolean; tierName: string | null; tierPrice: number | null; tierId: string | null;
@@ -14,7 +15,7 @@ export interface PostView {
 export interface TierView { id: string; name: string; price: number; perks: string[]; joinUrl: string | null; rank: number }
 export interface PageData {
   creator: CreatorRow; tiers: TierView[]; posts: PostView[]; rank: number; isOwner: boolean; signedIn: boolean;
-  ageOk: boolean; hideNsfw: boolean; canPay: boolean; tipUrl: string | null;
+  ageOk: boolean; hideNsfw: boolean; canPay: boolean; tipUrl: string | null; discordJoin: boolean;
 }
 
 const safeLink = (u: string): string | null => (/^https:\/\//i.test(u) ? u : null);
@@ -40,6 +41,8 @@ export async function loadPage(creator: CreatorRow): Promise<PageData> {
   }).filter((p) => p.state !== 'removed');
   return {
     creator, posts, rank, isOwner, signedIn: !!viewer, ageOk, hideNsfw, canPay,
+    // Offered only to people who currently have a paid plan with this creator.
+    discordJoin: !!creator.discordGuildId && rank > 0 && discordConfigured(),
     tiers: tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, perks: perksFromJson(t.perks), joinUrl: canPay ? safeLink(t.gankUrl) ?? safeLink(creator.gankUrl) : null, rank: ranks.get(t.id) ?? 0 })),
     tipUrl: canPay ? safeLink(creator.tipUrl) ?? safeLink(creator.gankUrl) : null,
   };

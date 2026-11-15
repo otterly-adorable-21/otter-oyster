@@ -98,6 +98,7 @@ export function CreatorPage({ d, path, background }: { d: PageData; path: string
                 <div className="handle">@{c.handle}</div>
                 <p className="bio" style={{ whiteSpace: 'pre-wrap' }}>{c.bio}</p>
                 <div className="who-actions">
+                  {d.discordJoin && <a className="btn btn-brand" href={`/api/discord/start?kind=join&creator=${c.handle}`}>Get my Discord role</a>}
                   <Link className="btn" href={`/${c.handle}/claim`}>Already paid? Claim access</Link>
                   <Link className="btn btn-ghost" href={`/report?creator=${c.handle}`}>Report</Link>
                 </div>

@@ -1,14 +1,18 @@
 import { get, run, newId, nowIso } from './db';
 
 /** Creates the demo creator once. Its art lives in public/example/ and is only used for this page. */
+export const EXAMPLE_HANDLE = 'example';
+
 export function ensureExample(): void {
+  // Earlier versions used the handle 'otterlyadorable'. Free it so the real owner can claim it.
+  run("UPDATE creators SET handle = ? WHERE isExample = 1 AND handle = 'otterlyadorable'", EXAMPLE_HANDLE);
   if (get('SELECT 1 FROM creators WHERE isExample = 1')) return;
   const uid = newId(), cid = newId();
   const now = nowIso();
   run('INSERT INTO users (id, createdAt) VALUES (?,?)', uid, now);
   run(`INSERT INTO creators (id,userId,handle,name,bio,mainColor,accentColor,dividerKind,mascotOn,mascotLines,gankUrl,gankNick,gankVerified,verifyCode,tipUrl,hookSecret,isExample,createdAt)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    cid, uid, 'otterlyadorable', 'Otterly Adorable',
+    cid, uid, EXAMPLE_HANDLE, 'Otterly Adorable',
     'An otter who paints ponds, lilies and very small adventures. This is a demo page: payment buttons go nowhere real.',
     '#00ffd5', '#ffffff', 'lily', 1, 'Thanks for stopping by!\nPond days are the best days.\nHave you seen my lilies?', 'https://example.com/', '', 0,
     'oo-demo', '', 'demo-' + newId(), 1, now);

@@ -1,0 +1,166 @@
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// Plain SQLite through Node's built-in driver: no native packages, one file on disk.
+// Columns are camelCase so rows map straight onto the types below. Booleans are 0 or 1.
+
+export function dataDir(): string {
+  return path.resolve(process.env.DATA_DIR || './data');
+}
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, createdAt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS user_emails (
+  id TEXT PRIMARY KEY, userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL UNIQUE, createdAt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS login_tokens (
+  id TEXT PRIMARY KEY, tokenHash TEXT NOT NULL UNIQUE, email TEXT NOT NULL,
+  purpose TEXT NOT NULL, userId TEXT, expiresAt TEXT NOT NULL, usedAt TEXT, createdAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_tokens_email ON login_tokens(email, createdAt);
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY, tokenHash TEXT NOT NULL UNIQUE,
+  userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expiresAt TEXT NOT NULL, createdAt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS creators (
+  id TEXT PRIMARY KEY, userId TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  handle TEXT NOT NULL UNIQUE, name TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '',
+  mainColor TEXT NOT NULL DEFAULT '#00ffd5', accentColor TEXT NOT NULL DEFAULT '#ffffff',
+  bannerFile TEXT, bannerGrad TEXT NOT NULL DEFAULT 'match',
+  avatarFile TEXT, avatarShape TEXT NOT NULL DEFAULT 'circle',
+  dividerKind TEXT NOT NULL DEFAULT 'line', dividerFile TEXT, logoFile TEXT,
+  bannerStatic TEXT, avatarStatic TEXT, logoStatic TEXT,
+  mascotOn INTEGER NOT NULL DEFAULT 0, mascotLines TEXT NOT NULL DEFAULT 'Thanks for stopping by!',
+  gankUrl TEXT NOT NULL DEFAULT '', gankNick TEXT NOT NULL DEFAULT '',
+  gankVerified INTEGER NOT NULL DEFAULT 0, verifyCode TEXT NOT NULL,
+  tipUrl TEXT NOT NULL DEFAULT '', hookSecret TEXT NOT NULL UNIQUE,
+  isExample INTEGER NOT NULL DEFAULT 0, suspended INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS tiers (
+  id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL, name TEXT NOT NULL, price INTEGER NOT NULL,
+  perks TEXT NOT NULL DEFAULT '[]', gankUrl TEXT NOT NULL DEFAULT '', gankTierRef TEXT,
+  UNIQUE (creatorId, gankTierRef)
+);
+CREATE TABLE IF NOT EXISTS posts (
+  id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+  -- RESTRICT: deleting a tier must never silently make its posts public.
+  tierId TEXT REFERENCES tiers(id) ON DELETE RESTRICT,
+  title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', nsfw INTEGER NOT NULL DEFAULT 0,
+  imageFile TEXT, imageAlt TEXT NOT NULL DEFAULT '', hidden INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_posts_creator ON posts(creatorId, createdAt);
+CREATE TABLE IF NOT EXISTS entitlements (
+  id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+  email TEXT NOT NULL, tierId TEXT NOT NULL REFERENCES tiers(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'active', paidThrough TEXT NOT NULL, sourceEventId TEXT NOT NULL,
+  createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, UNIQUE (creatorId, email)
+);
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id TEXT PRIMARY KEY, provider TEXT NOT NULL, providerEventId TEXT NOT NULL,
+  eventName TEXT NOT NULL, creatorNick TEXT NOT NULL DEFAULT '',
+  creatorId TEXT REFERENCES creators(id) ON DELETE SET NULL,
+  email TEXT NOT NULL DEFAULT '', priceRef TEXT, billingPeriod INTEGER,
+  status TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', raw TEXT NOT NULL, receivedAt TEXT NOT NULL,
+  UNIQUE (provider, providerEventId)
+);
+CREATE TABLE IF NOT EXISTS donations (
+  id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+  email TEXT NOT NULL, providerEventId TEXT NOT NULL UNIQUE, itemRef TEXT, createdAt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reports (
+  id TEXT PRIMARY KEY, postId TEXT, creatorHandle TEXT NOT NULL, reason TEXT NOT NULL,
+  details TEXT NOT NULL DEFAULT '', reporterEmail TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open', createdAt TEXT NOT NULL
+);
+`;
+
+const g = globalThis as unknown as { __oo_db?: DatabaseSync };
+
+function open(): DatabaseSync {
+  const file = process.env.DB_FILE || path.join(dataDir(), 'app.db');
+  if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
+  const d = new DatabaseSync(file);
+  d.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  d.exec(SCHEMA);
+  return d;
+}
+
+export function getDb(): DatabaseSync {
+  if (!g.__oo_db) g.__oo_db = open();
+  return g.__oo_db;
+}
+
+/** Tests only: throw the database away and start clean. */
+export function resetDbForTests(): void {
+  if (g.__oo_db) g.__oo_db.close();
+  g.__oo_db = undefined;
+}
+
+export type Param = SQLInputValue | boolean | undefined;
+function clean(params: Param[]): SQLInputValue[] {
+  return params.map((p) => (typeof p === 'boolean' ? (p ? 1 : 0) : p === undefined ? null : p));
+}
+
+export function all<T>(sql: string, ...params: Param[]): T[] {
+  return getDb().prepare(sql).all(...clean(params)) as T[];
+}
+export function get<T>(sql: string, ...params: Param[]): T | undefined {
+  return getDb().prepare(sql).get(...clean(params)) as T | undefined;
+}
+export function run(sql: string, ...params: Param[]): { changes: number } {
+  const r = getDb().prepare(sql).run(...clean(params));
+  return { changes: Number(r.changes) };
+}
+/** Run a block atomically. The block must be synchronous. */
+export function tx<T>(fn: () => T): T {
+  const d = getDb();
+  d.exec('BEGIN IMMEDIATE');
+  try {
+    const out = fn();
+    d.exec('COMMIT');
+    return out;
+  } catch (e) {
+    d.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+export const newId = (): string => randomUUID();
+export const nowIso = (): string => new Date().toISOString();
+
+// ---- row types ----
+export interface UserRow { id: string; createdAt: string }
+export interface CreatorRow {
+  id: string; userId: string; handle: string; name: string; bio: string;
+  mainColor: string; accentColor: string; bannerFile: string | null; bannerGrad: string;
+  avatarFile: string | null; avatarShape: string; dividerKind: string; dividerFile: string | null;
+  logoFile: string | null; bannerStatic: string | null; avatarStatic: string | null; logoStatic: string | null;
+  mascotOn: number; mascotLines: string; gankUrl: string; gankNick: string; gankVerified: number;
+  verifyCode: string; tipUrl: string; hookSecret: string; isExample: number; suspended: number; createdAt: string;
+}
+export interface TierRow {
+  id: string; creatorId: string; position: number; name: string; price: number;
+  perks: string; gankUrl: string; gankTierRef: string | null;
+}
+export interface PostRow {
+  id: string; creatorId: string; tierId: string | null; title: string; body: string; nsfw: number;
+  imageFile: string | null; imageAlt: string; hidden: number; createdAt: string;
+}
+export interface EntitlementRow {
+  id: string; creatorId: string; email: string; tierId: string; status: string;
+  paidThrough: string; sourceEventId: string; createdAt: string; updatedAt: string;
+}
+export interface WebhookEventRow {
+  id: string; provider: string; providerEventId: string; eventName: string; creatorNick: string;
+  creatorId: string | null; email: string; priceRef: string | null; billingPeriod: number | null;
+  status: string; note: string; raw: string; receivedAt: string;
+}

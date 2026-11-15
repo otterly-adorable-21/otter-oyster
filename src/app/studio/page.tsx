@@ -6,8 +6,7 @@ import { getViewer } from '@/lib/auth';
 import { getCreatorByUser, postsOf, tiersOf, unmatchedPrices } from '@/lib/creators';
 import { ACCENT_SWATCHES, DIVIDER_CHOICES, GRADIENTS, MAIN_SWATCHES, dividerDataUrl } from '@/lib/theme';
 import { perksFromJson } from '@/lib/validate';
-import { assignTierAction, createPageAction, deleteAccountAction, deletePostAction, requestReviewAction, rotateHookAction, saveGankAction, savePostAction, saveProfileAction, saveTiersAction, verifyGankAction } from './actions';
-import { VerifyButton } from './verify-button';
+import { assignTierAction, createPageAction, deleteAccountAction, deletePostAction, requestReviewAction, rotateHookAction, saveGankAction, saveSigningKeyAction, savePostAction, saveProfileAction, saveTiersAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 const appUrl = () => (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -129,8 +128,8 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <ol className="guide">
             <li className="gstep"><h4>Step 1: Create your tiers on Gank</h4><p>Use the same names and prices you set on the Page tab.</p></li>
             <li className={`gstep${c.gankUrl ? ' is-done' : ''}`}><h4>Step 2: Paste your public Gank page link below</h4></li>
-            <li className="gstep"><h4>Step 3: Put your verification code in your Gank bio</h4><p>This proves the page is yours.</p></li>
-            <li className={`gstep${c.gankVerified ? ' is-done' : ''}`}><h4>Step 4: Press Check my Gank page</h4></li>
+            <li className="gstep"><h4>Step 3: Put your verification code in your Gank bio</h4><p>This is how we know the page is yours.</p></li>
+            <li className={`gstep${c.gankVerified ? ' is-done' : ''}`}><h4>Step 4: Send us a review request</h4><p>A person on our team opens your Gank page, finds your code, and approves it. You get an email either way.</p></li>
             <li className="gstep"><h4>Step 5: Match your tiers (only if asked)</h4><p>After the first payment arrives, a box below asks which of your tiers it belongs to.</p></li>
           </ol>
           <h2>1. Your Gank page</h2>
@@ -144,12 +143,14 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <p>Add this code to your Gank bio or page description:</p>
           <p><code style={{ fontSize: '1.25rem', fontWeight: 800 }}>{c.verifyCode}</code></p>
           <p className="hint">Status: {c.gankVerified === 1 ? 'Verified' : c.gankVerified === 2 ? 'Waiting for review' : 'Not verified yet'}</p>
-          {c.gankVerified !== 1 && <VerifyButton action={verifyGankAction} disabled={!c.gankUrl} />}
-          {c.gankVerified === 0 && c.gankUrl && (
-            <form action={requestReviewAction} style={{ display: 'grid', gap: 6 }}>
-              <p className="hint">If the check cannot see your code even though it is in your bio (some Gank pages only show their bio after scripts run), ask for a manual review. Keep the code in your bio until you are approved.</p>
-              <div><button className="btn">Ask for a manual review</button></div>
-            </form>
+          {c.gankVerified === 0 && c.reviewResult && <p role="status" style={{ color: 'var(--danger)', fontWeight: 700 }}>Not approved: {c.reviewResult} Fix it, then send a new request.</p>}
+          {c.gankVerified === 2 && <p>Request sent{c.reviewRequestedAt ? ` on ${new Date(c.reviewRequestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}. Keep your code in your Gank bio until you are approved.</p>}
+          {c.gankVerified === 1 && <p>Verified. Fans can pay from your page. If you change your Gank link you will need a new review.</p>}
+          {c.gankVerified === 0 && (
+            <ActionForm action={requestReviewAction} submit="Send review request">
+              <p className="hint">Before you send: the Gank link above is saved and the code above is in your Gank bio. {c.gankUrl ? '' : 'Save your Gank link first.'}</p>
+              <div style={field}><label htmlFor="rn">Note for our team (optional)</label><input id="rn" name="note" maxLength={500} placeholder="Anything we should know?" /></div>
+            </ActionForm>
           )}
           <h2>3. Unmatched payments</h2>
           {waiting.length === 0 ? <p className="hint">Nothing waiting.</p> : waiting.map((w) => (
@@ -160,10 +161,23 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
               <div><button className="btn btn-brand">Match this tier</button></div>
             </form>
           ))}
-          <details className="adv"><summary className="btn">Advanced: your own webhook address</summary>
+          <h2>4. Connect your payments (webhook)</h2>
+          <p>This is how Gank tells the site that someone paid. <strong>Each creator connects their own Gank account.</strong> Gank has no setting that works for everyone at once.</p>
+          <p>Your private webhook address:</p>
+          <input readOnly value={`${appUrl()}/api/webhooks/gank/${c.hookSecret}`} aria-label="Webhook URL" />
+          <p className="hint">Keep it private. Only you and Gank should know it.</p>
+          <ol className="guide">
+            <li className="gstep"><h4>A. Register the address with Gank</h4><p>Gank only lets you do this through its Creator API, using a login token from your Gank account (see docs.ganknow.com, Creator API, Register webhook). Register that address for both events: USER_MEMBERSHIP.TX_SUCCEED and DIGITAL_GOODS.TX_SUCCEED. Gank also says digital-goods messages must be switched on by emailing support@ganknow.com.</p></li>
+            <li className="gstep"><h4>B. Copy the secret key Gank gives you back</h4><p>Gank replies with a key. Paste it below so we can check every message really came from Gank.</p></li>
+            <li className="gstep"><h4>C. Send a test</h4><p>Gank can send a test payment message to your address. A real payment is the final check.</p></li>
+          </ol>
+          <p className="hint">Careful: Gank allows only one webhook address per account. Registering this one replaces any other you had.</p>
+          <ActionForm action={saveSigningKeyAction} submit="Save key">
+            <div style={field}><label htmlFor="sk">Gank secret key {c.gankSigningKey ? '(saved, paste a new one to replace it)' : ''}</label><input id="sk" name="key" autoComplete="off" placeholder="Paste the key here" /></div>
+          </ActionForm>
+          <details className="adv"><summary className="btn">Make a new webhook address</summary>
             <div className="advin" style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-              <p className="hint">Most creators can skip this. Use it only if automatic unlocking is not working or Gank asks for it. Keep it private.</p>
-              <input readOnly value={`${appUrl()}/api/webhooks/gank/${c.hookSecret}`} aria-label="Webhook URL" />
+              <p className="hint">Only do this if your address leaked. You will need to register the new one with Gank again.</p>
               <form action={rotateHookAction}><button className="btn">Make a new address</button></form>
             </div></details>
         </>);

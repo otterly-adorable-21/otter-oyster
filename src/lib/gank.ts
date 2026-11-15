@@ -174,3 +174,22 @@ export function assignTierRef(creatorId: string, tierId: string, priceRef: strin
     return waiting.length;
   });
 }
+
+/**
+ * Gank says its signature works "similar to Stripe": a header like `t=<unix seconds>,v1=<hex>` where v1 is
+ * HMAC-SHA256 of `<t>.<raw body>` with the creator's secret key. VERIFY against a real webhook.
+ * We also accept a plain HMAC of the body, in case the real format differs.
+ */
+export function gankSignatureValid(rawBody: string, header: string | null, key: string, nowSec = Math.floor(Date.now() / 1000), toleranceSec = 600): boolean {
+  if (!header || !key) return false;
+  const parts = header.split(',').map((p) => p.trim().split('='));
+  const t = parts.find((p) => p[0] === 't')?.[1];
+  const v1s = parts.filter((p) => p[0] === 'v1').map((p) => p[1] ?? '');
+  if (t && v1s.length) {
+    const ts = Number(t);
+    if (!Number.isFinite(ts) || Math.abs(nowSec - ts) > toleranceSec) return false;
+    const mac = createHmac('sha256', key).update(`${t}.${rawBody}`).digest('hex');
+    return v1s.some((v) => safeEqual(v.toLowerCase(), mac));
+  }
+  return signatureValid(rawBody, header, key);
+}

@@ -3,7 +3,7 @@
 const RESERVED = new Set([
   'studio', 'login', 'logout', 'admin', 'api', 'media', 'auth', 'report', 'rules', 'terms', 'privacy',
   'claim', 'about', 'help', 'support', 'static', 'public', '_next', 'favicon', 'robots', 'sitemap',
-  'otter', 'oyster', 'otterandoyster', 'settings', 'account', 'signup', 'signin', 'explore', 'search',
+  'otter', 'oyster', 'otterandoyster', 'settings', 'account', 'signup', 'signin', 'explore', 'search', 'discord',
 ]);
 
 export function normalizeEmail(raw: unknown): string | null {

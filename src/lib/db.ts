@@ -41,13 +41,14 @@ CREATE TABLE IF NOT EXISTS creators (
   gankVerified INTEGER NOT NULL DEFAULT 0, verifyCode TEXT NOT NULL,
   tipUrl TEXT NOT NULL DEFAULT '', hookSecret TEXT NOT NULL UNIQUE, gankSigningKey TEXT NOT NULL DEFAULT '',
   reviewNote TEXT NOT NULL DEFAULT '', reviewRequestedAt TEXT, reviewResult TEXT NOT NULL DEFAULT '',
+  discordGuildId TEXT NOT NULL DEFAULT '', discordGuildName TEXT NOT NULL DEFAULT '',
   isExample INTEGER NOT NULL DEFAULT 0, suspended INTEGER NOT NULL DEFAULT 0,
   createdAt TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS tiers (
   id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
   position INTEGER NOT NULL, name TEXT NOT NULL, price INTEGER NOT NULL,
-  perks TEXT NOT NULL DEFAULT '[]', gankUrl TEXT NOT NULL DEFAULT '', gankTierRef TEXT,
+  perks TEXT NOT NULL DEFAULT '[]', gankUrl TEXT NOT NULL DEFAULT '', gankTierRef TEXT, discordRoleId TEXT NOT NULL DEFAULT '',
   UNIQUE (creatorId, gankTierRef)
 );
 CREATE TABLE IF NOT EXISTS posts (
@@ -77,6 +78,21 @@ CREATE TABLE IF NOT EXISTS donations (
   id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
   email TEXT NOT NULL, providerEventId TEXT NOT NULL UNIQUE, itemRef TEXT, createdAt TEXT NOT NULL
 );
+-- A fan's proven Discord account (OAuth), one per site account and one site account per Discord account.
+CREATE TABLE IF NOT EXISTS discord_links (
+  userId TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  discordUserId TEXT NOT NULL UNIQUE, username TEXT NOT NULL DEFAULT '', createdAt TEXT NOT NULL
+);
+-- The role we gave a fan in a creator's server, so we know what to take back.
+CREATE TABLE IF NOT EXISTS discord_grants (
+  userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+  roleId TEXT NOT NULL, grantedAt TEXT NOT NULL, PRIMARY KEY (userId, creatorId)
+);
+-- One-time OAuth state, so a Discord callback can only finish a flow this site started for this signed-in user.
+CREATE TABLE IF NOT EXISTS discord_states (
+  state TEXT PRIMARY KEY, kind TEXT NOT NULL, userId TEXT NOT NULL, creatorId TEXT NOT NULL, expiresAt TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS reports (
   id TEXT PRIMARY KEY, postId TEXT, creatorHandle TEXT NOT NULL, reason TEXT NOT NULL,
   details TEXT NOT NULL DEFAULT '', reporterEmail TEXT NOT NULL DEFAULT '',
@@ -99,6 +115,12 @@ function open(): DatabaseSync {
   addCol('reviewNote', "TEXT NOT NULL DEFAULT ''");
   addCol('reviewRequestedAt', 'TEXT');
   addCol('reviewResult', "TEXT NOT NULL DEFAULT ''");
+  addCol('discordGuildId', "TEXT NOT NULL DEFAULT ''");
+  addCol('discordGuildName', "TEXT NOT NULL DEFAULT ''");
+  const tcols = d.prepare('PRAGMA table_info(tiers)').all() as { name: string }[];
+  if (!tcols.some((c) => c.name === 'discordRoleId')) d.exec("ALTER TABLE tiers ADD COLUMN discordRoleId TEXT NOT NULL DEFAULT ''");
+  // A Discord server can belong to only one creator page.
+  d.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_creators_guild ON creators(discordGuildId) WHERE discordGuildId != ''");
   return d;
 }
 
@@ -153,11 +175,11 @@ export interface CreatorRow {
   avatarFile: string | null; avatarShape: string; dividerKind: string; dividerFile: string | null;
   logoFile: string | null; bannerStatic: string | null; avatarStatic: string | null; logoStatic: string | null;
   mascotOn: number; mascotLines: string; gankUrl: string; gankNick: string; gankVerified: number;
-  verifyCode: string; tipUrl: string; hookSecret: string; gankSigningKey: string; reviewNote: string; reviewRequestedAt: string | null; reviewResult: string; isExample: number; suspended: number; createdAt: string;
+  verifyCode: string; tipUrl: string; hookSecret: string; gankSigningKey: string; reviewNote: string; reviewRequestedAt: string | null; reviewResult: string; discordGuildId: string; discordGuildName: string; isExample: number; suspended: number; createdAt: string;
 }
 export interface TierRow {
   id: string; creatorId: string; position: number; name: string; price: number;
-  perks: string; gankUrl: string; gankTierRef: string | null;
+  perks: string; gankUrl: string; gankTierRef: string | null; discordRoleId: string;
 }
 export interface PostRow {
   id: string; creatorId: string; tierId: string | null; title: string; body: string; nsfw: number;

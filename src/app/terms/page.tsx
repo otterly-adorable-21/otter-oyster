@@ -24,7 +24,7 @@ export default function Terms() {
       <h2>3. Your account and your content</h2>
       <ul>
         <li>You own your content. By posting it, you give us permission to store, display and deliver it on the site so the service works, including to your supporters. This permission ends when you delete the content or your account, apart from short-term backups.</li>
-        <li>You promise that you have the right to post what you post, that it follows the <Link href="/rules">Content rules</Link>, and that any person shown in real photos or video is an adult who agreed to it.</li>
+        <li>You promise that you have the right to post what you post, that it follows the <Link href="/rules">Content rules</Link>.</li>
         <li>You are responsible for everything on your page, including AI-generated content, and for following the laws that apply to you, including tax and age-verification rules.</li>
         <li>Creators are responsible for any records the law requires them to keep about the people in their content.</li>
       </ul>

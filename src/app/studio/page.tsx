@@ -223,6 +223,9 @@ async function DiscordTab({ c, tiers, note }: { c: CreatorRow; tiers: TierRow[];
   return (<>
     {banner}
     <p>Connected server: <strong>{c.discordGuildName || 'your server'}</strong></p>
+    <div style={field}><label htmlFor="dj">Your supporter Discord link</label>
+      <input id="dj" readOnly value={`${appUrl()}/${c.handle}/discord`} />
+      <span className="hint">Share this instead of a normal Discord invite, for example in your Gank membership welcome message. Supporters sign in, link their Discord once and are added with their role. Keep your server&apos;s own invite links private, because anyone with one can join without a role.</span></div>
     {problem && <p role="status" style={{ color: 'var(--danger)', fontWeight: 700 }}>{problem}</p>}
     {tiers.length === 0 ? <p className="hint">Add tiers on the Page tab first.</p> : (
       <ActionForm action={saveDiscordRolesAction} submit="Save roles">

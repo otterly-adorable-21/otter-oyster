@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ActionForm } from '@/components/ActionForm';
+import { ColorPicker } from '@/components/ColorPicker';
 import { getViewer } from '@/lib/auth';
 import { getCreatorByUser, postsOf, tiersOf, unmatchedPrices } from '@/lib/creators';
-import { ACCENT_SWATCHES, DIVIDER_CHOICES, GRADIENTS, MAIN_SWATCHES } from '@/lib/theme';
+import { ACCENT_SWATCHES, DIVIDER_CHOICES, GRADIENTS, MAIN_SWATCHES, dividerDataUrl } from '@/lib/theme';
 import { perksFromJson } from '@/lib/validate';
-import { assignTierAction, createPageAction, deletePostAction, rotateHookAction, saveGankAction, savePostAction, saveProfileAction, saveTiersAction, verifyGankAction } from './actions';
+import { assignTierAction, createPageAction, deleteAccountAction, deletePostAction, rotateHookAction, saveGankAction, savePostAction, saveProfileAction, saveTiersAction, verifyGankAction } from './actions';
 import { VerifyButton } from './verify-button';
 
 export const dynamic = 'force-dynamic';
@@ -49,17 +50,20 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
         <ActionForm action={saveProfileAction} submit="Save page">
           <div style={field}><label htmlFor="n">Display name</label><input id="n" name="name" defaultValue={c.name} maxLength={60} /></div>
           <div style={field}><label htmlFor="b">About you</label><textarea id="b" name="bio" defaultValue={c.bio} rows={4} maxLength={1200} /></div>
-          <div style={field}><label htmlFor="mc">Main color</label><input id="mc" name="mainColor" type="color" defaultValue={c.mainColor} />
-            <span className="hint">Ideas: {MAIN_SWATCHES.map((s) => `${s.n} ${s.c}`).join(', ')}</span></div>
-          <div style={field}><label htmlFor="ac">Accent color</label><input id="ac" name="accentColor" type="color" defaultValue={c.accentColor} />
-            <span className="hint">Ideas: {ACCENT_SWATCHES.map((s) => `${s.n} ${s.c}`).join(', ')}</span></div>
+          <ColorPicker name="mainColor" label="Main color" swatches={MAIN_SWATCHES} value={c.mainColor} />
+          <ColorPicker name="accentColor" label="Accent color" swatches={ACCENT_SWATCHES} value={c.accentColor} />
           <div style={field}><label htmlFor="g">Banner when no image</label>
             <select id="g" name="bannerGrad" defaultValue={c.bannerGrad}>{GRADIENTS.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></div>
           <div style={field}><label htmlFor="sh">Profile picture shape</label>
             <select id="sh" name="avatarShape" defaultValue={c.avatarShape}><option value="circle">Circle</option><option value="rounded">Rounded</option><option value="square">Square</option></select></div>
-          <div style={field}><label htmlFor="dv">Section divider</label>
-            <select id="dv" name="dividerKind" defaultValue={c.dividerKind}>{DIVIDER_CHOICES.map((d) => <option key={d.id} value={d.id}>{d.n}</option>)}{c.dividerFile && <option value="upload">My upload</option>}</select>
-            <label htmlFor="dvf">Or upload your own</label><input id="dvf" type="file" name="divider" accept="image/png,image/jpeg,image/webp,image/gif" /></div>
+          <fieldset className="tier-ed"><legend>Section divider</legend>
+            <div className="swatches">{DIVIDER_CHOICES.map((d) => (
+              <label key={d.id} className="swatch wide"><input type="radio" name="dividerKind" value={d.id} defaultChecked={c.dividerKind === d.id} />
+                <span className="divprev" style={d.id === 'none' ? undefined : { backgroundImage: `url("${dividerDataUrl(d.id, c.accentColor === '#ffffff' ? '#0a7e86' : c.accentColor)}")` }} /><em>{d.n}</em></label>))}
+              {c.dividerFile && <label className="swatch wide"><input type="radio" name="dividerKind" value="upload" defaultChecked={c.dividerKind === 'upload'} /><span className="divprev" style={{ backgroundImage: `url("/media/file/${c.dividerFile}")` }} /><em>My upload</em></label>}
+            </div>
+            <label htmlFor="dvf">Or upload your own</label><input id="dvf" type="file" name="divider" accept="image/png,image/jpeg,image/webp,image/gif" />
+          </fieldset>
           {([['banner', 'Banner image', c.bannerFile], ['avatar', 'Profile picture', c.avatarFile], ['logo', 'Footer logo', c.logoFile]] as const).map(([k, label, cur]) => (
             <div key={k} style={field}><label htmlFor={`f-${k}`}>{label}</label><input id={`f-${k}`} type="file" name={k} accept="image/png,image/jpeg,image/webp,image/gif" />
               {cur && <label className="check"><input type="checkbox" name={`clear_${k}`} /> Remove current image</label>}</div>
@@ -83,6 +87,12 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
               </fieldset>
             );
           })}
+        </ActionForm>
+
+        <h2>Delete my account</h2>
+        <p className="hint">This permanently deletes your page, tiers, posts, images and sign-in. Fans' payments stay with Gank. It cannot be undone.</p>
+        <ActionForm action={deleteAccountAction} submit="Delete everything">
+          <div style={field}><label htmlFor="cf">Type your handle ({c.handle}) to confirm</label><input id="cf" name="confirm" autoComplete="off" /></div>
         </ActionForm>
       </>)}
 

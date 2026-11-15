@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { endSession, getViewer } from '@/lib/auth';
 import { assignTierRef } from '@/lib/gank';
 import {
-  createCreator, deleteAccount, deletePost, getCreatorByUser, markVerified, saveTiers, savePost, setGankLink, setImageField, updateProfile, type TierInput,
+  createCreator, deleteAccount, deletePost, getCreatorByUser, markVerified, requestReview, saveTiers, savePost, setGankLink, setImageField, updateProfile, type TierInput,
 } from '@/lib/creators';
 import { deleteImage, ImageError, saveImage, type ImageKind } from '@/lib/images';
 import { verifyCodeOnPage, VerifyError } from '@/lib/verify';
@@ -160,4 +160,10 @@ export async function deleteAccountAction(_p: Msg | null, form: FormData): Promi
   for (const f of files) await deleteImage(f);
   await endSession();
   redirect('/');
+}
+
+export async function requestReviewAction() {
+  const c = await mine();
+  requestReview(c);
+  revalidatePath('/studio');
 }

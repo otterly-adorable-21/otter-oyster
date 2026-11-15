@@ -6,13 +6,15 @@ import { getViewer } from '@/lib/auth';
 import { getCreatorByUser, postsOf, tiersOf, unmatchedPrices } from '@/lib/creators';
 import { ACCENT_SWATCHES, DIVIDER_CHOICES, GRADIENTS, MAIN_SWATCHES, dividerDataUrl } from '@/lib/theme';
 import { perksFromJson } from '@/lib/validate';
-import { assignTierAction, createPageAction, deleteAccountAction, deletePostAction, requestReviewAction, rotateHookAction, saveGankAction, saveSigningKeyAction, savePostAction, saveProfileAction, saveTiersAction } from './actions';
+import { discord, discordConfigured, type DiscordRole } from '@/lib/discord';
+import type { CreatorRow, TierRow } from '@/lib/db';
+import { assignTierAction, createPageAction, deleteAccountAction, disconnectDiscordAction, saveDiscordRolesAction, deletePostAction, requestReviewAction, rotateHookAction, saveGankAction, saveSigningKeyAction, savePostAction, saveProfileAction, saveTiersAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 const appUrl = () => (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 const field = { display: 'grid', gap: 4 } as const;
 
-export default async function Studio({ searchParams }: { searchParams: Promise<{ tab?: string; edit?: string }> }) {
+export default async function Studio({ searchParams }: { searchParams: Promise<{ tab?: string; edit?: string; d?: string }> }) {
   const v = await getViewer();
   if (!v) redirect('/login?next=/studio');
   const c = getCreatorByUser(v.user.id);
@@ -33,7 +35,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
   }
 
   const q = await searchParams;
-  const tab = q.tab === 'post' || q.tab === 'payments' ? q.tab : 'page';
+  const tab = q.tab === 'post' || q.tab === 'payments' || q.tab === 'discord' ? q.tab : 'page';
   const tiers = tiersOf(c.id), posts = postsOf(c.id);
   const editing = q.edit ? posts.find((p) => p.id === q.edit) : undefined;
   const tabLink = (id: string, label: string) => <Link key={id} className={`btn${tab === id ? ' btn-brand' : ''}`} href={`/studio?tab=${id}`}>{label}</Link>;
@@ -43,7 +45,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
     <div style={wrap}>
       <h1>Creator studio</h1>
       <div className="field"><label htmlFor="share">Your page link</label><input id="share" readOnly value={share} /> <Link href={`/${c.handle}`}>Open my page</Link></div>
-      <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{tabLink('page', 'Page')}{tabLink('post', 'Posts')}{tabLink('payments', 'Payments')}</nav>
+      <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{tabLink('page', 'Page')}{tabLink('post', 'Posts')}{tabLink('payments', 'Payments')}{tabLink('discord', 'Discord')}</nav>
 
       {tab === 'page' && (<>
         <ActionForm action={saveProfileAction} submit="Save page">
@@ -121,6 +123,8 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
         ))}
       </>)}
 
+      {tab === 'discord' && <DiscordTab c={c} tiers={tiers} note={q.d} />}
+
       {tab === 'payments' && (() => {
         const waiting = unmatchedPrices(c.id);
         return (<>
@@ -184,4 +188,61 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
       })()}
     </div>
   );
+}
+
+const DISCORD_NOTES: Record<string, [boolean, string]> = {
+  added: [true, 'The bot is in your server. Now choose a role for each tier below.'],
+  cancelled: [false, 'You cancelled on Discord, so nothing changed.'],
+  taken: [false, 'That Discord server is already connected to another page here.'],
+  failed: [false, 'Something went wrong adding the bot. Try again. If it keeps happening, check that you picked a server where you can manage the server.'],
+};
+
+async function DiscordTab({ c, tiers, note }: { c: CreatorRow; tiers: TierRow[]; note?: string }) {
+  const n = note ? DISCORD_NOTES[note] : undefined;
+  const banner = n && <p role="status" style={{ color: n[0] ? 'inherit' : 'var(--danger)', fontWeight: 700 }}>{n[1]}</p>;
+  if (!discordConfigured()) {
+    return <><p className="note">Discord roles are not switched on for this site yet. The site owner needs to finish the Discord setup first.</p></>;
+  }
+  if (!c.discordGuildId) {
+    return (<>
+      {banner}
+      <p className="note">Give your supporters a role in your own Discord server automatically. The role matches their tier, and it is taken away if their plan ends.</p>
+      <ol className="guide">
+        <li className="gstep"><h4>Step 1: Add the Otter &amp; Oyster bot to your server</h4><p>You pick the server on Discord. You need to be able to manage that server. The bot only asks for permission to manage roles and to invite people. It does not read messages.</p></li>
+        <li className="gstep"><h4>Step 2: Choose a role for each tier</h4><p>The bot can make the roles for you, or you can pick roles you already have.</p></li>
+        <li className="gstep"><h4>Step 3: Supporters press “Get my Discord role”</h4><p>That button appears on your page for people with a paid plan. They sign in with Discord, and the bot adds them to your server with their role.</p></li>
+      </ol>
+      <div><a className="btn btn-brand" href="/api/discord/start?kind=install">Add the bot to my Discord server</a></div>
+      {tiers.length === 0 && <p className="hint">You have no tiers yet. Add tiers on the Page tab so there is something to give roles for.</p>}
+    </>);
+  }
+  let roles: DiscordRole[] = [];
+  let problem = '';
+  try { roles = await discord.manageableRoles(c.discordGuildId); }
+  catch { problem = 'We could not read your server. The bot may have been removed from it. Disconnect and add it again.'; }
+  return (<>
+    {banner}
+    <p>Connected server: <strong>{c.discordGuildName || 'your server'}</strong></p>
+    {problem && <p role="status" style={{ color: 'var(--danger)', fontWeight: 700 }}>{problem}</p>}
+    {tiers.length === 0 ? <p className="hint">Add tiers on the Page tab first.</p> : (
+      <ActionForm action={saveDiscordRolesAction} submit="Save roles">
+        {tiers.map((t) => (
+          <div key={t.id} style={field}>
+            <label htmlFor={`role_${t.id}`}>{t.name} (${t.price}/mo) gets this role</label>
+            <select id={`role_${t.id}`} name={`role_${t.id}`} defaultValue={roles.some((r) => r.id === t.discordRoleId) ? t.discordRoleId : ''}>
+              <option value="">No role</option>
+              <option value="__new__">Make a new role called “{t.name}”</option>
+              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
+        ))}
+        <p className="hint">A supporter gets the role for their highest tier only. Roles are checked about every half hour and removed when a plan ends. To use a role you already have, it must sit below the bot&apos;s own role in your server&apos;s role list. Roles the bot makes always work.</p>
+      </ActionForm>
+    )}
+    <details className="adv"><summary className="btn">Disconnect this server</summary>
+      <div className="advin" style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+        <p className="hint">The bot leaves your server. People who already have a role keep it until you remove it yourself.</p>
+        <form action={disconnectDiscordAction}><button className="btn">Disconnect</button></form>
+      </div></details>
+  </>);
 }

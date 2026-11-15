@@ -127,3 +127,21 @@ export function markVerified(c: CreatorRow): { ok: true } | { ok: false; error: 
 export const unmatchedPrices = (creatorId: string): { priceRef: string; n: number; last: string }[] =>
   all(`SELECT priceRef, COUNT(*) n, MAX(receivedAt) last FROM webhook_events
        WHERE creatorId = ? AND status = 'unmatched' AND priceRef IS NOT NULL GROUP BY priceRef`, creatorId);
+
+/** Deletes a creator's whole account: page, tiers, posts, payments records, login emails and sessions. Returns image files to remove from disk. */
+export function deleteAccount(userId: string): string[] {
+  return tx(() => {
+    const c = getCreatorByUser(userId);
+    const files: string[] = [];
+    if (c) {
+      if (c.isExample) return files;
+      for (const f of [c.bannerFile, c.avatarFile, c.logoFile, c.dividerFile]) if (f) files.push(f);
+      for (const p of postsOf(c.id)) if (p.imageFile) files.push(p.imageFile);
+      // Posts first: a tier that still has posts is protected from deletion on purpose.
+      run('DELETE FROM posts WHERE creatorId = ?', c.id);
+      run('DELETE FROM creators WHERE id = ?', c.id);
+    }
+    run('DELETE FROM users WHERE id = ?', userId);
+    return files;
+  });
+}

@@ -18,7 +18,7 @@ export default async function Home() {
         <p><Link className="btn btn-brand" href="/studio">Start your page</Link></p>
         <p className="hint">Below is a demo page, so you can see what yours could look like.</p>
       </section>
-      <CreatorPage d={d} path="/" background="/example/pond.webp" />
+      <CreatorPage d={d} path="/" />
     </>
   );
 }

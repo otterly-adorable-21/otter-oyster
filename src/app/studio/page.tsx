@@ -6,7 +6,7 @@ import { getViewer } from '@/lib/auth';
 import { getCreatorByUser, postsOf, tiersOf, unmatchedPrices } from '@/lib/creators';
 import { ACCENT_SWATCHES, DIVIDER_CHOICES, GRADIENTS, MAIN_SWATCHES, dividerDataUrl } from '@/lib/theme';
 import { perksFromJson } from '@/lib/validate';
-import { assignTierAction, createPageAction, deleteAccountAction, deletePostAction, rotateHookAction, saveGankAction, savePostAction, saveProfileAction, saveTiersAction, verifyGankAction } from './actions';
+import { assignTierAction, createPageAction, deleteAccountAction, deletePostAction, requestReviewAction, rotateHookAction, saveGankAction, savePostAction, saveProfileAction, saveTiersAction, verifyGankAction } from './actions';
 import { VerifyButton } from './verify-button';
 
 export const dynamic = 'force-dynamic';
@@ -143,8 +143,14 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <h2>2. Prove it is yours</h2>
           <p>Add this code to your Gank bio or page description:</p>
           <p><code style={{ fontSize: '1.25rem', fontWeight: 800 }}>{c.verifyCode}</code></p>
-          <p className="hint">Status: {c.gankVerified ? 'Verified' : 'Not verified yet'}</p>
-          <VerifyButton action={verifyGankAction} disabled={!c.gankUrl} />
+          <p className="hint">Status: {c.gankVerified === 1 ? 'Verified' : c.gankVerified === 2 ? 'Waiting for review' : 'Not verified yet'}</p>
+          {c.gankVerified !== 1 && <VerifyButton action={verifyGankAction} disabled={!c.gankUrl} />}
+          {c.gankVerified === 0 && c.gankUrl && (
+            <form action={requestReviewAction} style={{ display: 'grid', gap: 6 }}>
+              <p className="hint">If the check cannot see your code even though it is in your bio (some Gank pages only show their bio after scripts run), ask for a manual review. Keep the code in your bio until you are approved.</p>
+              <div><button className="btn">Ask for a manual review</button></div>
+            </form>
+          )}
           <h2>3. Unmatched payments</h2>
           {waiting.length === 0 ? <p className="hint">Nothing waiting.</p> : waiting.map((w) => (
             <form key={w.priceRef} action={assignTierAction} className="tier-ed" style={{ display: 'grid', gap: 8 }}>

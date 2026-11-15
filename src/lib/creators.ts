@@ -111,8 +111,11 @@ export function setGankLink(c: CreatorRow, urlRaw: string, tipRaw: string): { ok
   if (tip === null) return { ok: false, error: 'The tip link is not a valid https:// link.' };
   const nick = url ? nickFromUrl(url) : '';
   const changed = url !== c.gankUrl;
-  run('UPDATE creators SET gankUrl = ?, gankNick = ?, tipUrl = ?, gankVerified = CASE WHEN ? THEN 0 ELSE gankVerified END WHERE id = ?',
-    url, nick, tip, changed ? 1 : 0, c.id);
+  run(`UPDATE creators SET gankUrl = ?, gankNick = ?, tipUrl = ?,
+    gankVerified = CASE WHEN ? THEN 0 ELSE gankVerified END,
+    reviewNote = CASE WHEN ? THEN '' ELSE reviewNote END, reviewRequestedAt = CASE WHEN ? THEN NULL ELSE reviewRequestedAt END,
+    reviewResult = CASE WHEN ? THEN '' ELSE reviewResult END WHERE id = ?`,
+    url, nick, tip, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0, c.id);
   return { ok: true };
 }
 
@@ -120,7 +123,7 @@ export function setGankLink(c: CreatorRow, urlRaw: string, tipRaw: string): { ok
 export function markVerified(c: CreatorRow): { ok: true } | { ok: false; error: string } {
   const other = get('SELECT 1 FROM creators WHERE gankNick = ? AND gankVerified = 1 AND id != ?', c.gankNick, c.id);
   if (other) return { ok: false, error: 'That Gank page is already connected to another account.' };
-  run('UPDATE creators SET gankVerified = 1 WHERE id = ?', c.id);
+  run("UPDATE creators SET gankVerified = 1, reviewResult = '' WHERE id = ?", c.id);
   return { ok: true };
 }
 
@@ -149,16 +152,25 @@ export function deleteAccount(userId: string): string[] {
 }
 
 /** Creator asks the site owner to check their Gank page by eye (used when the automatic check cannot see the bio). 0 = not verified, 1 = verified, 2 = waiting for review. */
-export function requestReview(c: CreatorRow): boolean {
+/** The creator's ticket: "my code is in my Gank bio, please check". Optional short note for the admin. */
+export function requestReview(c: CreatorRow, note: string): boolean {
   if (!c.gankUrl || c.gankVerified !== 0) return false;
-  run('UPDATE creators SET gankVerified = 2 WHERE id = ?', c.id);
+  run("UPDATE creators SET gankVerified = 2, reviewNote = ?, reviewRequestedAt = ?, reviewResult = '' WHERE id = ?",
+    note.trim().slice(0, 500), new Date().toISOString(), c.id);
   return true;
 }
 
 export function pendingReviews(): CreatorRow[] {
-  return all<CreatorRow>('SELECT * FROM creators WHERE gankVerified = 2 AND suspended = 0 ORDER BY createdAt');
+  return all<CreatorRow>('SELECT * FROM creators WHERE gankVerified = 2 AND suspended = 0 ORDER BY reviewRequestedAt, createdAt');
 }
 
-export function rejectReview(creatorId: string): void {
-  run('UPDATE creators SET gankVerified = 0 WHERE id = ? AND gankVerified = 2', creatorId);
+/** Sends the ticket back with a reason the creator can read. */
+export function rejectReview(creatorId: string, reason: string): void {
+  run('UPDATE creators SET gankVerified = 0, reviewResult = ? WHERE id = ? AND gankVerified = 2',
+    reason.trim().slice(0, 500) || 'We could not see your code on that Gank page.', creatorId);
+}
+
+/** Login emails for a creator (to tell them the result of their ticket). */
+export function creatorEmails(userId: string): string[] {
+  return all<{ email: string }>('SELECT email FROM user_emails WHERE userId = ? ORDER BY createdAt', userId).map((r) => r.email);
 }

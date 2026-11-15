@@ -100,7 +100,10 @@ export async function getViewer(): Promise<Viewer | null> {
   return { user, emails };
 }
 
+export function adminEmails(): string[] {
+  return (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
 export function isAdminEmail(emails: string[]): boolean {
-  const list = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const list = adminEmails();
   return emails.some((e) => list.includes(e));
 }

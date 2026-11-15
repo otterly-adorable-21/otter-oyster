@@ -147,3 +147,18 @@ export function deleteAccount(userId: string): string[] {
     return files;
   });
 }
+
+/** Creator asks the site owner to check their Gank page by eye (used when the automatic check cannot see the bio). 0 = not verified, 1 = verified, 2 = waiting for review. */
+export function requestReview(c: CreatorRow): boolean {
+  if (!c.gankUrl || c.gankVerified !== 0) return false;
+  run('UPDATE creators SET gankVerified = 2 WHERE id = ?', c.id);
+  return true;
+}
+
+export function pendingReviews(): CreatorRow[] {
+  return all<CreatorRow>('SELECT * FROM creators WHERE gankVerified = 2 AND suspended = 0 ORDER BY createdAt');
+}
+
+export function rejectReview(creatorId: string): void {
+  run('UPDATE creators SET gankVerified = 0 WHERE id = ? AND gankVerified = 2', creatorId);
+}

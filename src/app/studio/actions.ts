@@ -7,7 +7,8 @@ import {
   createCreator, deleteAccount, deletePost, getCreatorByUser, markVerified, requestReview, saveTiers, savePost, setGankLink, setImageField, updateProfile, type TierInput,
 } from '@/lib/creators';
 import { deleteImage, ImageError, saveImage, type ImageKind } from '@/lib/images';
-import { verifyCodeOnPage, VerifyError } from '@/lib/verify';
+import { sendMail } from '@/lib/email';
+import { adminEmails } from '@/lib/auth';
 import { run } from '@/lib/db';
 
 export interface Msg { ok: boolean; msg: string }
@@ -119,23 +120,6 @@ export async function saveGankAction(_p: Msg | null, form: FormData): Promise<Ms
   return done('Saved. If you changed the page link, check it again below.');
 }
 
-export async function verifyGankAction(): Promise<Msg> {
-  const c = await mine();
-  if (!c.gankUrl) return fail('Add your Gank page link first.');
-  try {
-    const r = await verifyCodeOnPage(c.gankUrl, c.verifyCode);
-    if (!r.ok) return fail(r.reason);
-  } catch (e) {
-    if (e instanceof VerifyError) return fail(e.message);
-    console.error('verify failed', e);
-    return fail('Could not check that page right now. Try again in a minute.');
-  }
-  const m = markVerified(c);
-  if (!m.ok) return fail(m.error);
-  revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
-  return done('Verified. Fans can now pay from your page.');
-}
-
 export async function assignTierAction(form: FormData) {
   const c = await mine();
   const tierId = String(form.get('tierId') || ''), ref = String(form.get('priceRef') || '');
@@ -162,8 +146,26 @@ export async function deleteAccountAction(_p: Msg | null, form: FormData): Promi
   redirect('/');
 }
 
-export async function requestReviewAction() {
+export async function requestReviewAction(_p: Msg | null, form: FormData): Promise<Msg> {
   const c = await mine();
-  requestReview(c);
+  if (!c.gankUrl) return fail('Save your Gank page link first.');
+  if (!requestReview(c, String(form.get('note') || ''))) return fail('Your page is already verified or waiting for review.');
+  // Tell the admins there is a ticket. Best effort: the ticket is saved even if the email fails.
+  const site = (process.env.APP_URL || '').replace(/\/$/, '');
+  for (const to of adminEmails()) {
+    sendMail(to, `Gank page waiting for review: @${c.handle}`,
+      `@${c.handle} asked for a review.\n\nGank page: ${c.gankUrl}\nCode to find in their bio: ${c.verifyCode}\n\nReview it here: ${site}/admin`)
+      .catch((e) => console.error('admin notice failed', e));
+  }
   revalidatePath('/studio');
+  return done('Sent. We will check your Gank bio for your code. Keep the code there until you hear back.');
+}
+
+export async function saveSigningKeyAction(_p: Msg | null, form: FormData): Promise<Msg> {
+  const c = await mine();
+  const key = String(form.get('key') || '').trim();
+  if (key.length > 300 || /\s/.test(key)) return fail('That does not look like a signing key. It is one long string with no spaces.');
+  run('UPDATE creators SET gankSigningKey = ? WHERE id = ?', key, c.id);
+  revalidatePath('/studio');
+  return done(key ? 'Saved. Payment messages are now checked against this key.' : 'Key removed.');
 }

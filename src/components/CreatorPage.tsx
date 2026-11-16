@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { bannerGradient, dividerDataUrl, themeVars } from '@/lib/theme';
 import type { PageData, PostView } from '@/lib/view';
 import { confirmAge, toggleHide } from '@/app/actions';
+import { SupportButton, SupportDialog } from './SupportDialog';
 
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
 const dateText = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -57,7 +58,7 @@ function Post({ p, d, path }: { p: PostView; d: PageData; path: string }) {
         <div className="post-media"><Art seed={p.id} blur /><div className="lockdot" aria-hidden="true">🔒</div></div>
         <div className="post-text">{head}
           <p>{p.tierName} tier and up. Join for ${p.tierPrice}/mo to unlock this post.</p>
-          {t?.joinUrl && <div><a className="btn btn-creator" href={t.joinUrl} target="_blank" rel="noopener noreferrer">Unlock with {t.name}</a></div>}
+          {t && d.canPay && <div><SupportButton tierId={t.id}>Unlock with {t.name}</SupportButton></div>}
         </div>
       </article>
     );
@@ -120,28 +121,25 @@ export function CreatorPage({ d, path, background }: { d: PageData; path: string
           <div className="foot"><img src={logoUrl} alt={`${c.name} logo`} /></div>
           <div className="dock">
             <h2>{c.name}</h2>
-            <div className="dock-tiers">
-              {d.tiers.length === 0 || !d.canPay ? <span className="dock-note">Memberships are not open yet</span> : d.tiers.map((t, i) => {
-                const idx = i + 1;
-                if (idx === cur) return <button key={t.id} className="btn chip" disabled>{t.name}: your plan</button>;
-                if (idx < cur) return <button key={t.id} className="btn chip" disabled>{t.name}: included</button>;
-                return t.joinUrl ? <a key={t.id} className="btn btn-creator chip" href={t.joinUrl} target="_blank" rel="noopener noreferrer">{t.name} ${t.price}/mo</a> : null;
-              })}
-            </div>
+            {(() => {
+              const mine = d.tiers.find((t) => t.rank === cur);
+              return mine && <span className="badge dock-plan">Your plan: {mine.name}</span>;
+            })()}
             {d.tiers.length > 0 && (
               <details className="perkbox"><summary className="btn">What is included</summary>
                 <div className="perkpanel">{d.tiers.map((t) => <section key={t.id}><h3>{t.name} <span>${t.price}/mo</span></h3><ul className="perks">{t.perks.map((x, i) => <li key={i}><span>{x}</span></li>)}</ul></section>)}</div>
               </details>
             )}
-            {d.tipUrl && <a className="btn btn-creator" href={d.tipUrl} target="_blank" rel="noopener noreferrer">Leave a tip</a>}
-            {d.payPages.length > 1 && (
-              <div className="dock-tiers"><span className="dock-note">Also on</span>
-                {d.payPages.map((p) => <a key={p.id} className="btn btn-ghost chip" href={p.url} target="_blank" rel="noopener noreferrer">{p.name}</a>)}
-              </div>
-            )}
+            {d.canPay
+              ? <SupportButton className="btn btn-creator dock-support">Support</SupportButton>
+              : <span className="dock-note">Memberships are not open yet</span>}
           </div>
         </div>
       </div>
+      {d.canPay && (
+        <SupportDialog name={c.name} handle={c.handle} rank={cur} tipUrl={d.tipUrl} sites={d.payPages}
+          tiers={d.tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, rank: t.rank, ownUrl: t.ownUrl }))} />
+      )}
       {c.mascotOn === 1 && avatarUrl && lines.length > 0 && (
         <div className="mascot-wrap" aria-hidden="true"><img className="mascot" src={avatarUrl} alt="" />
           {lines.length === 1 ? <div className="speech solo">{lines[0]}</div> : [0, 1, 2, 3].map((i) => <div key={i} className="speech" style={{ animationDelay: `${i * 1.6}s` }}>{lines[i % lines.length]}</div>)}

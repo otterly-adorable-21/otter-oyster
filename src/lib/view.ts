@@ -14,10 +14,13 @@ export interface PostView {
   // Only filled when state is 'open'. Locked, age-gated and hidden posts never carry their text or image to the browser.
   body?: string; hasImage?: boolean; imageAlt?: string;
 }
-export interface TierView { id: string; name: string; price: number; perks: string[]; joinUrl: string | null; rank: number }
+/** ownUrl: the creator's own payment link for just this tier, if they set one. */
+export interface TierView { id: string; name: string; price: number; perks: string[]; ownUrl: string | null; rank: number }
 export interface PageData {
   creator: CreatorRow; tiers: TierView[]; posts: PostView[]; rank: number; isOwner: boolean; signedIn: boolean;
-  ageOk: boolean; hideNsfw: boolean; canPay: boolean; tipUrl: string | null; discordJoin: boolean;
+  ageOk: boolean; hideNsfw: boolean; canPay: boolean; discordJoin: boolean;
+  /** A separate tip link, only when the creator set one. Otherwise tips happen on the payment sites. */
+  tipUrl: string | null;
   /** Every place a fan can pay this creator, in a fixed order. */
   payPages: { id: string; name: string; url: string }[];
 }
@@ -45,7 +48,6 @@ export async function loadPage(creator: CreatorRow): Promise<PageData> {
     }),
   ];
   const canPay = payPages.length > 0;
-  const mainPay = payPages[0]?.url ?? null;
   const byId = new Map(tiers.map((t) => [t.id, t]));
   const posts = postsOf(creator.id).map((p: PostRow): PostView => {
     const state = postState({ tierId: p.tierId, nsfw: !!p.nsfw, hidden: !!p.hidden }, { ranks, rank, isOwner, ageOk, hideNsfw });
@@ -58,7 +60,7 @@ export async function loadPage(creator: CreatorRow): Promise<PageData> {
     creator, posts, rank, isOwner, signedIn: !!viewer, ageOk, hideNsfw, canPay, payPages,
     // Offered only to people who currently have a paid plan with this creator.
     discordJoin: !!creator.discordGuildId && rank > 0 && discordConfigured(),
-    tiers: tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, perks: perksFromJson(t.perks), joinUrl: canPay ? safeLink(t.gankUrl) ?? mainPay : null, rank: ranks.get(t.id) ?? 0 })),
-    tipUrl: canPay ? safeLink(creator.tipUrl) ?? mainPay : null,
+    tiers: tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, perks: perksFromJson(t.perks), ownUrl: canPay ? safeLink(t.gankUrl) : null, rank: ranks.get(t.id) ?? 0 })),
+    tipUrl: canPay ? safeLink(creator.tipUrl) : null,
   };
 }

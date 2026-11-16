@@ -21,8 +21,16 @@ export const linkOf = (creatorId: string, provider: ProviderId): PaymentLinkRow 
 export const linkBySecret = (provider: ProviderId, secret: string): PaymentLinkRow | undefined =>
   /^[a-f0-9]{48}$/.test(secret) ? get<PaymentLinkRow>('SELECT * FROM payment_links WHERE provider = ? AND hookSecret = ?', provider, secret) : undefined;
 
-/** Connected = the platform has reached us at least once, or the creator saved the platform's secret (proof they opened its webhook settings). */
-export const linkReady = (l: PaymentLinkRow | undefined): boolean => !!l && (!!l.lastEventAt || !!l.signingKey);
+/**
+ * Connected = the platform has reached us at least once, or the creator saved the platform's secret (proof they opened
+ * its webhook settings), or, for a platform with no test button, the creator told us they added the link there.
+ */
+export const linkReady = (l: PaymentLinkRow | undefined): boolean => !!l && (!!l.lastEventAt || !!l.signingKey || !!l.confirmedAt);
+
+/** The creator says they pasted the link into a platform that cannot send a test (SubscribeStar). */
+export function confirmLink(creatorId: string, provider: ProviderId): void {
+  run('UPDATE payment_links SET confirmedAt = ? WHERE creatorId = ? AND provider = ?', nowIso(), creatorId, provider);
+}
 
 const secret = (): string => randomBytes(24).toString('hex');
 
@@ -53,7 +61,7 @@ export function saveSigningKey(creatorId: string, provider: ProviderId, key: str
 
 /** New private link (if the old one leaked). The saved secret is cleared too, so a Ko-fi token is learned again. */
 export function rotateLink(creatorId: string, provider: ProviderId): void {
-  run("UPDATE payment_links SET hookSecret = ?, signingKey = '', lastEventAt = NULL WHERE creatorId = ? AND provider = ?", secret(), creatorId, provider);
+  run("UPDATE payment_links SET hookSecret = ?, signingKey = '', lastEventAt = NULL, confirmedAt = NULL WHERE creatorId = ? AND provider = ?", secret(), creatorId, provider);
 }
 
 export function removeLink(creatorId: string, provider: ProviderId): void {

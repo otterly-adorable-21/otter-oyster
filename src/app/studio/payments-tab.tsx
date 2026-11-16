@@ -4,7 +4,7 @@ import { get, type CreatorRow, type PaymentLinkRow, type TierRow } from '@/lib/d
 import { linkReady, linksOf } from '@/lib/payments/process';
 import { PROVIDERS, PROVIDER_ORDER, type ProviderInfo } from '@/lib/payments/providers';
 import {
-  assignTierAction, removePayLinkAction, requestReviewAction, rotateHookAction, rotatePayLinkAction, saveGankAction,
+  assignTierAction, confirmPayLinkAction, removePayLinkAction, requestReviewAction, rotateHookAction, rotatePayLinkAction, saveGankAction,
   savePayPageAction, savePaySecretAction, saveSigningKeyAction, startPayAction,
 } from './actions';
 import { AutoRefresh, CopyField } from './copy-field';
@@ -82,7 +82,7 @@ function PayCard({ c, p, link }: { c: CreatorRow; p: ProviderInfo; link?: Paymen
       <li>
         <strong>Copy your private link</strong> and paste it into {p.name}.
         <CopyField value={hookUrl} label={`Your private ${p.name} link`} />
-        <span className="hint" style={{ display: 'block' }}>On {p.name}: {p.settingsPath}. Paste it into the webhook (URL) box and save. <a href={p.settingsUrl} target="_blank" rel="noopener noreferrer">Open {p.name} ↗</a></span>
+        <span className="hint" style={{ display: 'block' }}>On {p.name}, go to {p.settingsPath}. {p.pasteHint}{p.settingsUrl && <> <a href={p.settingsUrl} target="_blank" rel="noopener noreferrer">Open {p.name} ↗</a></>}</span>
         {p.extraNote && <p className="note" style={{ marginTop: 6 }}>{p.extraNote}</p>}
       </li>
       <li>
@@ -90,11 +90,8 @@ function PayCard({ c, p, link }: { c: CreatorRow; p: ProviderInfo; link?: Paymen
           <strong>Send a test from {p.name}.</strong> {p.testHint}
           <span className="hint"> This card turns green by itself a few seconds later. You do not need to copy anything back.</span>
         </>) : (<>
-          <strong>Paste {p.name}&apos;s {p.secretName.toLowerCase()} here.</strong> It is on the same page where you pasted the link. It lets us check every payment message really comes from {p.name}.
-          <ActionForm action={savePaySecretAction} submit="Save" className="inline-form">
-            {hidden}
-            <input name="key" autoComplete="off" placeholder={`${p.secretName}`} aria-label={`${p.name} ${p.secretName}`} />
-          </ActionForm>
+          <strong>Press the button once it is saved on {p.name}.</strong> {p.name} has no test button, so your first real payment is the final check. Pressing it adds a {p.name} button to your page.
+          <form action={confirmPayLinkAction} style={{ marginTop: 6 }}>{hidden}<button className="btn btn-brand">I added it on {p.name}</button></form>
         </>)}
       </li>
     </ol>
@@ -107,23 +104,25 @@ function PayCard({ c, p, link }: { c: CreatorRow; p: ProviderInfo; link?: Paymen
         <span className={`pill${ready ? ' on' : ' wait'}`}>{ready ? 'Connected ✓' : 'Waiting for step 3'}</span>
       </div>
       {ready ? (<>
-        <p>{link.lastEventAt ? `${p.name} last reached us ${ago(link.lastEventAt)}.` : `Set up. The first payment from ${p.name} will confirm it.`}{last ? ` Last message: ${last.note}.` : ''}</p>
+        <p>{link.lastEventAt ? `${p.name} last reached us ${ago(link.lastEventAt)}.` : `Set up. We have not heard from ${p.name} yet; the first payment will confirm it works. If a supporter pays and nothing unlocks, check step 2 again.`}{last ? ` Last message: ${last.note}.` : ''}</p>
         {!link.pageUrl && <p role="status" style={{ color: 'var(--danger)', fontWeight: 700 }}>Add your {p.name} page link (step 1) so fans see a button for it on your page.</p>}
         <details className="adv"><summary className="btn">Show the setup steps again</summary><div className="advin">{steps}</div></details>
       </>) : steps}
 
       <details className="adv"><summary className="btn">More options</summary>
         <div className="advin">
-          <ActionForm action={savePaySecretAction} submit="Save">
-            {hidden}
-            <div style={field}>
-              <label htmlFor={`sk-${p.id}`}>{p.name} {p.secretName.toLowerCase()} {link.signingKey ? '(saved)' : '(optional)'}</label>
-              <input id={`sk-${p.id}`} name="key" autoComplete="off" placeholder={link.signingKey ? 'Paste a new one to replace it, or leave empty to remove' : 'Paste it here'} />
-              <span className="hint">{p.secretLearned
-                ? `We pick this up by ourselves from ${p.name}'s first message. Only paste it if ${p.name} gave you a new one.`
-                : `Extra safety: when saved, any message without ${p.name}'s matching signature is refused.`}</span>
-            </div>
-          </ActionForm>
+          {p.secretName && (
+            <ActionForm action={savePaySecretAction} submit="Save">
+              {hidden}
+              <div style={field}>
+                <label htmlFor={`sk-${p.id}`}>{p.name} {p.secretName.toLowerCase()} {link.signingKey ? '(saved)' : '(optional)'}</label>
+                <input id={`sk-${p.id}`} name="key" autoComplete="off" placeholder={link.signingKey ? 'Paste a new one to replace it, or leave empty to remove' : 'Paste it here'} />
+                <span className="hint">{p.secretLearned
+                  ? `We pick this up by ourselves from ${p.name}'s first message. Only paste it if ${p.name} gave you a new one.`
+                  : `Extra safety: when saved, any message without ${p.name}'s matching signature is refused.`}</span>
+              </div>
+            </ActionForm>
+          )}
           <p className="hint">Make a new private link only if yours leaked. You will need to paste the new one into {p.name} again.</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <form action={rotatePayLinkAction}>{hidden}<button className="btn">Make a new private link</button></form>

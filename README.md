@@ -47,15 +47,16 @@ Creators do this themselves in Studio, Payments. There is nothing for the site o
 1. Press Connect, then paste their page link (for example `ko-fi.com/name`).
 2. Copy the private link shown and paste it into the platform's webhook setting:
    - Ko-fi: More, API, Webhooks.
-   - Buy Me a Coffee: Settings, Webhooks, Create new webhook.
-   - SubscribeStar: Profile Settings, Webhooks. SubscribeStar only switches webhooks on for approved pages, sometimes on request.
-3. Send a test from the platform (Ko-fi, Buy Me a Coffee) and the card turns green by itself. SubscribeStar has no test button, so there the creator pastes the webhook secret instead.
+   - Buy Me a Coffee: Integrations, Webhooks, Create. Paste the link and choose all the events.
+   - SubscribeStar: profile page Settings, API, Add client. Paste the link and tick `subscriber.payment.read`.
+3. Send a test from the platform (Ko-fi, Buy Me a Coffee) and the card turns green by itself. SubscribeStar has no test button, so the creator presses "I added it on SubscribeStar" instead, and the first real payment is the final check.
 
 How it stays simple and still safe:
 
 - **No page review.** Each creator gets their own private link per platform (`/api/webhooks/kofi/<secret>` and so on). A message can only reach that link if the creator pasted it into their own account, so we know whose payment it is.
 - **No secret to copy for Ko-fi.** Ko-fi puts its verification token in every message. We save it from the first one (normally the test), and refuse any later message without it.
-- **Buy Me a Coffee and SubscribeStar** sign their messages. Pasting that secret is optional for Buy Me a Coffee and is step 3 for SubscribeStar. Once it is saved, unsigned messages are refused.
+- **Buy Me a Coffee** signs its messages. Pasting its secret is optional; once saved, unsigned messages are refused.
+- **SubscribeStar** is not asked for a secret yet, because it is not confirmed which secret (if any) an API client signs with. A wrong one would block every real payment. The private link alone still ties each message to the right creator.
 - **Tiers match by themselves**, first by name, then by price (when exactly one tier has that price). If neither works, the creator sees "Payments waiting for you" and picks the tier once. Earlier payments for that tier are then applied.
 - **Payment buttons appear on the page only after the link works**, so fans never pay into a setup that cannot unlock anything.
 
@@ -67,7 +68,7 @@ What each platform can and cannot tell us:
 | Buy Me a Coffee | yes, with the paid-up date when sent | yes | yes | yes |
 | SubscribeStar | yes (priced in cents, matched to tiers by price) | yes | yes (dispute) | yes |
 
-SubscribeStar supporters must share their email with the creator on SubscribeStar, or the message arrives without an email and nothing unlocks.
+If a SubscribeStar message arrives without the supporter's email, nothing unlocks. The supporter can share their email with the creator on SubscribeStar, or use "Already paid? Claim access". Creator page links on `subscribestar.art`, `subscribestar.com` and `subscribestar.adult` are all accepted.
 
 ### Things to check with a real message (look for `VERIFY` in `src/lib/payments/parse.ts`)
 
@@ -75,7 +76,7 @@ The parsers follow each platform's public docs and community examples. These doc
 
 - Buy Me a Coffee: the field names inside `data` (email, membership level, period end) and the signature header name (`x-signature-sha256` or `x-bmc-signature`; both are accepted).
 - Ko-fi: how test messages are marked (we treat `@example.com` emails and Ko-fi's all-zero test transaction id as tests).
-- SubscribeStar: whether the signature is still HMAC-MD5 (we accept MD5 or SHA-256), and the event names.
+- SubscribeStar: that messages from an API client (scope `subscriber.payment.read`) have the same shape as the older webhook messages this parser follows, and whether they are signed. If they are, add a secret field back for SubscribeStar in `src/lib/payments/providers.ts` (the MD5 or SHA-256 check is already written).
 
 Every message is stored in the `webhook_events` table (Ko-fi tokens are blanked out), so one real test from each platform is enough to confirm.
 

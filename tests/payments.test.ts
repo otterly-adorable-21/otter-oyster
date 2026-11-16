@@ -3,7 +3,7 @@ process.env.DB_FILE = ':memory:';
 import { createHmac } from 'node:crypto';
 import { resetDbForTests, run, get, all, newId, nowIso, type EntitlementRow } from '../src/lib/db';
 import { parseBmc, parseKofi, parseSubscribeStar, bmcSignatureValid, subscribeStarSignatureValid } from '../src/lib/payments/parse';
-import { assignProviderRef, ensureLink, kofiTokenOk, linkBySecret, linkReady, processPaymentEvent, savePageUrl } from '../src/lib/payments/process';
+import { assignProviderRef, confirmLink, rotateLink, ensureLink, kofiTokenOk, linkBySecret, linkReady, processPaymentEvent, savePageUrl } from '../src/lib/payments/process';
 import { unmatchedPrices } from '../src/lib/creators';
 
 function seed() {
@@ -168,6 +168,18 @@ describe('page links', () => {
     expect(get<{ pageUrl: string }>("SELECT pageUrl FROM payment_links WHERE provider = 'kofi'")!.pageUrl).toBe('https://ko-fi.com/otterly');
     expect(savePageUrl(cid, 'kofi', 'https://evil.example/ko-fi.com').ok).toBe(false);
     expect(savePageUrl(cid, 'subscribestar', 'https://subscribestar.adult/otterly').ok).toBe(true);
+    expect(savePageUrl(cid, 'subscribestar', 'https://subscribestar.art/otterly-adorable').ok).toBe(true);
+    expect(savePageUrl(cid, 'subscribestar', 'https://subscribestar.evil/otterly').ok).toBe(false);
+  });
+  it('SubscribeStar is ready once the creator says the link is added, until the link is replaced', () => {
+    const { cid } = seed();
+    ensureLink(cid, 'subscribestar');
+    const ready = () => linkReady(get('SELECT * FROM payment_links WHERE provider = ?', 'subscribestar'));
+    expect(ready()).toBe(false);
+    confirmLink(cid, 'subscribestar');
+    expect(ready()).toBe(true);
+    rotateLink(cid, 'subscribestar');
+    expect(ready()).toBe(false);
   });
   it('a suspended creator gets nothing', () => {
     const { cid } = seed();

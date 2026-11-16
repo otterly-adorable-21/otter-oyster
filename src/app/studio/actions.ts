@@ -12,7 +12,7 @@ import { adminEmails } from '@/lib/auth';
 import { run } from '@/lib/db';
 import { discord } from '@/lib/discord';
 import { leaveQuietly, revokeAllFor, soon, syncCreator } from '@/lib/discord-sync';
-import { assignProviderRef, ensureLink, removeLink, rotateLink, savePageUrl, saveSigningKey } from '@/lib/payments/process';
+import { assignProviderRef, confirmLink, ensureLink, removeLink, rotateLink, savePageUrl, saveSigningKey } from '@/lib/payments/process';
 import { isProvider, PROVIDERS, type ProviderId } from '@/lib/payments/providers';
 
 export interface Msg { ok: boolean; msg: string }
@@ -254,6 +254,14 @@ export async function savePaySecretAction(_p: Msg | null, form: FormData): Promi
   saveSigningKey(c.id, p, key);
   revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
   return done(key ? `Saved. Every message from ${PROVIDERS[p].name} is now checked against it.` : 'Removed.');
+}
+
+/** For a platform with no test button: the creator says the link is pasted in, so the payment button can appear. */
+export async function confirmPayLinkAction(form: FormData) {
+  const c = await mine();
+  const p = providerOf(form);
+  if (p) confirmLink(c.id, p);
+  revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
 }
 
 export async function rotatePayLinkAction(form: FormData) {

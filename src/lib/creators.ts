@@ -127,9 +127,10 @@ export function markVerified(c: CreatorRow): { ok: true } | { ok: false; error: 
   return { ok: true };
 }
 
-export const unmatchedPrices = (creatorId: string): { priceRef: string; n: number; last: string }[] =>
-  all(`SELECT priceRef, COUNT(*) n, MAX(receivedAt) last FROM webhook_events
-       WHERE creatorId = ? AND status = 'unmatched' AND priceRef IS NOT NULL GROUP BY priceRef`, creatorId);
+/** Payments waiting for the creator to say which tier they belong to, one row per platform tier. */
+export const unmatchedPrices = (creatorId: string): { provider: string; priceRef: string; label: string; n: number; last: string }[] =>
+  all(`SELECT provider, priceRef, MAX(refLabel) label, COUNT(*) n, MAX(receivedAt) last FROM webhook_events
+       WHERE creatorId = ? AND status = 'unmatched' AND priceRef IS NOT NULL GROUP BY provider, priceRef ORDER BY last DESC`, creatorId);
 
 /** Deletes a creator's whole account: page, tiers, posts, payments records, login emails and sessions. Returns image files to remove from disk. */
 export function deleteAccount(userId: string): string[] {

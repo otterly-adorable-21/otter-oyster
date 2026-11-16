@@ -279,6 +279,8 @@ input[type=checkbox]{width:auto;min-height:0}
 input[type=color]{width:64px;padding:2px}
 a{color:var(--brand)}
 a.btn,button.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--ink)}
+button.btn-brand{color:var(--on-brand)}
+a.btn-creator,button.btn-creator{color:var(--c-on)}
 a.btn-brand,.btn-brand{color:var(--on-brand)}
 .dock a.btn-creator,.btn-creator{color:var(--c-on)}
 .swatches{display:flex;flex-wrap:wrap;gap:10px}
@@ -289,3 +291,19 @@ a.btn-brand,.btn-brand{color:var(--on-brand)}
 .swatch input:checked+span{box-shadow:0 0 0 4px var(--brand)}
 .swatch input:focus-visible+span{outline:3px solid var(--brand);outline-offset:3px}
 .swatch em{font-style:normal}
+
+/* Payment platform cards in the studio */
+.pcards{display:grid;gap:14px}
+.pcard{border:2px solid var(--line);border-radius:18px;padding:14px;display:grid;gap:12px}
+.pcard.is-on{border-color:var(--brand)}
+.pcard-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pcard-h h3{font-size:1.15rem}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 12px;font-weight:800;font-size:.8125rem;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)}
+.pill.on{background:var(--brand);color:var(--on-brand);border-color:transparent}
+.pill.wait{border-style:dashed}
+.copyfield{display:flex;gap:8px;flex-wrap:wrap}
+.copyfield input{flex:1 1 260px;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8125rem}
+.steps{margin:0;padding-left:1.3em;display:grid;gap:8px}
+.steps li{padding-left:2px}
+.inline-form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.inline-form input{flex:1 1 240px;min-width:0}

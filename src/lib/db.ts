@@ -93,6 +93,19 @@ CREATE TABLE IF NOT EXISTS discord_grants (
 CREATE TABLE IF NOT EXISTS discord_states (
   state TEXT PRIMARY KEY, kind TEXT NOT NULL, userId TEXT NOT NULL, creatorId TEXT NOT NULL, expiresAt TEXT NOT NULL
 );
+-- A creator's connection to Ko-fi, Buy Me a Coffee or SubscribeStar. The private hookSecret in the
+-- webhook address is what ties incoming payments to this creator, so no page review is needed.
+CREATE TABLE IF NOT EXISTS payment_links (
+  id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL, pageUrl TEXT NOT NULL DEFAULT '', hookSecret TEXT NOT NULL UNIQUE,
+  signingKey TEXT NOT NULL DEFAULT '', lastEventAt TEXT, createdAt TEXT NOT NULL,
+  UNIQUE (creatorId, provider)
+);
+-- Which of a creator's tiers a platform's tier (or price) belongs to. Filled automatically by name or price, or by the creator.
+CREATE TABLE IF NOT EXISTS tier_refs (
+  creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE, provider TEXT NOT NULL, ref TEXT NOT NULL,
+  tierId TEXT NOT NULL REFERENCES tiers(id) ON DELETE CASCADE, PRIMARY KEY (creatorId, provider, ref)
+);
 CREATE TABLE IF NOT EXISTS reports (
   id TEXT PRIMARY KEY, postId TEXT, creatorHandle TEXT NOT NULL, reason TEXT NOT NULL,
   details TEXT NOT NULL DEFAULT '', reporterEmail TEXT NOT NULL DEFAULT '',
@@ -119,6 +132,8 @@ function open(): DatabaseSync {
   addCol('discordGuildName', "TEXT NOT NULL DEFAULT ''");
   const tcols = d.prepare('PRAGMA table_info(tiers)').all() as { name: string }[];
   if (!tcols.some((c) => c.name === 'discordRoleId')) d.exec("ALTER TABLE tiers ADD COLUMN discordRoleId TEXT NOT NULL DEFAULT ''");
+  const wcols = d.prepare('PRAGMA table_info(webhook_events)').all() as { name: string }[];
+  if (!wcols.some((c) => c.name === 'refLabel')) d.exec("ALTER TABLE webhook_events ADD COLUMN refLabel TEXT NOT NULL DEFAULT ''");
   // A Discord server can belong to only one creator page.
   d.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_creators_guild ON creators(discordGuildId) WHERE discordGuildId != ''");
   return d;
@@ -192,5 +207,9 @@ export interface EntitlementRow {
 export interface WebhookEventRow {
   id: string; provider: string; providerEventId: string; eventName: string; creatorNick: string;
   creatorId: string | null; email: string; priceRef: string | null; billingPeriod: number | null;
-  status: string; note: string; raw: string; receivedAt: string;
+  status: string; note: string; raw: string; receivedAt: string; refLabel: string;
+}
+export interface PaymentLinkRow {
+  id: string; creatorId: string; provider: string; pageUrl: string; hookSecret: string;
+  signingKey: string; lastEventAt: string | null; createdAt: string;
 }

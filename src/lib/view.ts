@@ -5,6 +5,8 @@ import { postsOf, tiersOf } from './creators';
 import type { CreatorRow, PostRow, TierRow } from './db';
 import { perksFromJson } from './validate';
 import { discordConfigured } from './discord';
+import { linksOf, linkReady } from './payments/process';
+import { PROVIDERS, PROVIDER_ORDER, isProvider } from './payments/providers';
 
 export interface PostView {
   id: string; title: string; date: string; nsfw: boolean; tierName: string | null; tierPrice: number | null; tierId: string | null;
@@ -16,6 +18,8 @@ export interface TierView { id: string; name: string; price: number; perks: stri
 export interface PageData {
   creator: CreatorRow; tiers: TierView[]; posts: PostView[]; rank: number; isOwner: boolean; signedIn: boolean;
   ageOk: boolean; hideNsfw: boolean; canPay: boolean; tipUrl: string | null; discordJoin: boolean;
+  /** Every place a fan can pay this creator, in a fixed order. */
+  payPages: { id: string; name: string; url: string }[];
 }
 
 const safeLink = (u: string): string | null => (/^https:\/\//i.test(u) ? u : null);
@@ -29,8 +33,19 @@ export async function loadPage(creator: CreatorRow): Promise<PageData> {
   const tiers: TierRow[] = tiersOf(creator.id);
   const ranks = tierRanks(tiers);
   const rank = viewer ? viewerRank(creator.id, viewer.emails, ranks) : 0;
-  // Payment links are only offered once the creator has proven the Gank page is theirs (the example page is a demo).
-  const canPay = !!creator.gankUrl && (creator.gankVerified === 1 || creator.isExample === 1);
+  // Payment links are only offered once they are proven: a Gank page by review, the other platforms by a
+  // working webhook link (so a fan's payment really unlocks something). The example page is a demo.
+  const gankOk = !!creator.gankUrl && (creator.gankVerified === 1 || creator.isExample === 1);
+  const links = linksOf(creator.id);
+  const payPages = [
+    ...(gankOk && safeLink(creator.gankUrl) ? [{ id: 'gank', name: 'Gank', url: creator.gankUrl }] : []),
+    ...PROVIDER_ORDER.flatMap((p) => {
+      const l = links.find((x) => x.provider === p);
+      return l && isProvider(l.provider) && linkReady(l) && safeLink(l.pageUrl) ? [{ id: p, name: PROVIDERS[p].name, url: l.pageUrl }] : [];
+    }),
+  ];
+  const canPay = payPages.length > 0;
+  const mainPay = payPages[0]?.url ?? null;
   const byId = new Map(tiers.map((t) => [t.id, t]));
   const posts = postsOf(creator.id).map((p: PostRow): PostView => {
     const state = postState({ tierId: p.tierId, nsfw: !!p.nsfw, hidden: !!p.hidden }, { ranks, rank, isOwner, ageOk, hideNsfw });
@@ -40,10 +55,10 @@ export async function loadPage(creator: CreatorRow): Promise<PageData> {
     return base;
   }).filter((p) => p.state !== 'removed');
   return {
-    creator, posts, rank, isOwner, signedIn: !!viewer, ageOk, hideNsfw, canPay,
+    creator, posts, rank, isOwner, signedIn: !!viewer, ageOk, hideNsfw, canPay, payPages,
     // Offered only to people who currently have a paid plan with this creator.
     discordJoin: !!creator.discordGuildId && rank > 0 && discordConfigured(),
-    tiers: tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, perks: perksFromJson(t.perks), joinUrl: canPay ? safeLink(t.gankUrl) ?? safeLink(creator.gankUrl) : null, rank: ranks.get(t.id) ?? 0 })),
-    tipUrl: canPay ? safeLink(creator.tipUrl) ?? safeLink(creator.gankUrl) : null,
+    tiers: tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, perks: perksFromJson(t.perks), joinUrl: canPay ? safeLink(t.gankUrl) ?? mainPay : null, rank: ranks.get(t.id) ?? 0 })),
+    tipUrl: canPay ? safeLink(creator.tipUrl) ?? mainPay : null,
   };
 }

@@ -12,6 +12,8 @@ import { adminEmails } from '@/lib/auth';
 import { run } from '@/lib/db';
 import { discord } from '@/lib/discord';
 import { leaveQuietly, revokeAllFor, syncCreator } from '@/lib/discord-sync';
+import { assignProviderRef, ensureLink, removeLink, rotateLink, savePageUrl, saveSigningKey } from '@/lib/payments/process';
+import { isProvider, PROVIDERS, type ProviderId } from '@/lib/payments/providers';
 
 export interface Msg { ok: boolean; msg: string }
 const fail = (msg: string): Msg => ({ ok: false, msg });
@@ -125,7 +127,11 @@ export async function saveGankAction(_p: Msg | null, form: FormData): Promise<Ms
 export async function assignTierAction(form: FormData) {
   const c = await mine();
   const tierId = String(form.get('tierId') || ''), ref = String(form.get('priceRef') || '');
-  if (tierId && ref) assignTierRef(c.id, tierId, ref);
+  const provider = String(form.get('provider') || 'gank');
+  if (tierId && ref) {
+    if (provider === 'gank') assignTierRef(c.id, tierId, ref);
+    else if (isProvider(provider)) assignProviderRef(c.id, provider, ref, tierId);
+  }
   revalidatePath('/studio');
 }
 
@@ -207,4 +213,55 @@ export async function disconnectDiscordAction() {
   run('DELETE FROM discord_grants WHERE creatorId = ?', c.id);
   run("UPDATE creators SET discordGuildId = '', discordGuildName = '' WHERE id = ?", c.id);
   revalidatePath('/studio');
+}
+
+// ---------- Ko-fi, Buy Me a Coffee, SubscribeStar ----------
+
+const providerOf = (form: FormData): ProviderId | null => {
+  const p = String(form.get('provider') || '');
+  return isProvider(p) ? p : null;
+};
+
+/** Step 1 for a platform: save the public page link and make the private webhook link. */
+export async function savePayPageAction(_p: Msg | null, form: FormData): Promise<Msg> {
+  const c = await mine();
+  const p = providerOf(form);
+  if (!p) return fail('Unknown platform.');
+  const r = savePageUrl(c.id, p, String(form.get('pageUrl') || ''));
+  if (!r.ok) return fail(r.error);
+  revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
+  return done('Saved. Now do step 2 below.');
+}
+
+/** Starts a platform without a page link yet, so the creator can see their webhook link straight away. */
+export async function startPayAction(form: FormData) {
+  const c = await mine();
+  const p = providerOf(form);
+  if (p) ensureLink(c.id, p);
+  revalidatePath('/studio');
+}
+
+export async function savePaySecretAction(_p: Msg | null, form: FormData): Promise<Msg> {
+  const c = await mine();
+  const p = providerOf(form);
+  if (!p) return fail('Unknown platform.');
+  const key = String(form.get('key') || '').trim();
+  if (key.length > 300 || /\s/.test(key)) return fail('That does not look right. It should be one long piece of text with no spaces.');
+  saveSigningKey(c.id, p, key);
+  revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
+  return done(key ? `Saved. Every message from ${PROVIDERS[p].name} is now checked against it.` : 'Removed.');
+}
+
+export async function rotatePayLinkAction(form: FormData) {
+  const c = await mine();
+  const p = providerOf(form);
+  if (p) rotateLink(c.id, p);
+  revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
+}
+
+export async function removePayLinkAction(form: FormData) {
+  const c = await mine();
+  const p = providerOf(form);
+  if (p) removeLink(c.id, p);
+  revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
 }

@@ -89,8 +89,9 @@ export function addMonths(d: Date, months: number): Date {
 export const paidThroughFor = (at: Date, months: number | null): Date =>
   new Date(addMonths(at, months ?? 1).getTime() + GRACE_DAYS * 86400_000);
 
-function grant(creatorId: string, email: string, tierId: string, at: Date, months: number | null, sourceEventId: string): void {
-  const through = paidThroughFor(at, months).toISOString();
+export function grant(creatorId: string, email: string, tierId: string, at: Date, months: number | null, sourceEventId: string, until?: Date): void {
+  // A platform that tells us the paid-up date exactly (plus grace) beats our own month count.
+  const through = (until ? new Date(until.getTime() + GRACE_DAYS * 86400_000) : paidThroughFor(at, months)).toISOString();
   const now = nowIso();
   const existing = get<{ id: string; paidThrough: string }>('SELECT id, paidThrough FROM entitlements WHERE creatorId = ? AND email = ?', creatorId, email);
   if (!existing) {

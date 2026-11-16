@@ -134,6 +134,11 @@ export function CreatorPage({ d, path, background }: { d: PageData; path: string
               </details>
             )}
             {d.tipUrl && <a className="btn btn-creator" href={d.tipUrl} target="_blank" rel="noopener noreferrer">Leave a tip</a>}
+            {d.payPages.length > 1 && (
+              <div className="dock-tiers"><span className="dock-note">Also on</span>
+                {d.payPages.map((p) => <a key={p.id} className="btn btn-ghost chip" href={p.url} target="_blank" rel="noopener noreferrer">{p.name}</a>)}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { consumeToken, findOrCreateUserByEmail, linkEmail, startSession } from '@/lib/auth';
+import { soon, syncUser } from '@/lib/discord-sync';
 
 // The link opens a confirm page and only a button press (POST) spends the token, so mail scanners that
 // pre-open links cannot use it up.
@@ -11,6 +12,9 @@ async function confirm(form: FormData) {
   if (!row) redirect('/auth/verify?expired=1');
   if (row.purpose === 'link' && row.userId) {
     if (!linkEmail(row.userId, row.email)) redirect('/auth/verify?taken=1');
+    // A newly claimed email can unlock a plan, so their Discord roles may change.
+    const uid = row.userId;
+    soon('role update', () => syncUser(uid));
     await startSession(row.userId);
   } else {
     await startSession(findOrCreateUserByEmail(row.email));

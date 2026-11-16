@@ -72,7 +72,7 @@ export function signatureValid(rawBody: string, header: string | null, secret: s
 // ---------- processing ----------
 
 export type Outcome = 'processed' | 'unmatched' | 'ignored' | 'rejected' | 'duplicate';
-export interface ProcessResult { outcome: Outcome; note: string }
+export interface ProcessResult { outcome: Outcome; note: string; creatorId?: string }
 
 const GRACE_DAYS = 3;
 
@@ -128,7 +128,7 @@ export function processGankEvent(ev: GankEvent, raw: string, opts: ProcessOption
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         newId(), 'gank', ev.providerEventId, ev.eventName, ev.creatorNick, creator?.id ?? null, ev.email, ev.priceRef, ev.billingPeriod,
         outcome, note, raw.slice(0, 20000), at.toISOString());
-      return { outcome, note };
+      return { outcome, note, creatorId: creator?.id };
     };
 
     if (ev.kind === 'ignored') return save('ignored', 'event type not used');

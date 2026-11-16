@@ -8,8 +8,16 @@ const API = 'https://discord.com/api/v10';
 export const BOT_PERMISSIONS = 268435457;
 
 export class DiscordError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  /** `code` is Discord's own error number, e.g. 10004 unknown server, 10007 unknown member, 10011 unknown role, 50001 no access. */
+  constructor(public status: number, message: string, public code = 0) { super(message); }
 }
+
+/** Discord error numbers we act on. */
+export const DC = { UNKNOWN_GUILD: 10004, UNKNOWN_MEMBER: 10007, UNKNOWN_ROLE: 10011, MISSING_ACCESS: 50001, MISSING_PERMISSIONS: 50013 } as const;
+
+/** True when the bot can no longer reach the server at all (it was kicked, or the server was deleted). */
+export const botLostServer = (e: unknown): boolean =>
+  e instanceof DiscordError && (e.code === DC.UNKNOWN_GUILD || e.code === DC.MISSING_ACCESS || (e.status === 403 && e.code !== DC.MISSING_PERMISSIONS));
 
 const env = (k: string): string => (process.env[k] || '').trim();
 export const discordConfigured = (): boolean => !!(env('DISCORD_CLIENT_ID') && env('DISCORD_CLIENT_SECRET') && env('DISCORD_BOT_TOKEN'));
@@ -55,7 +63,7 @@ async function call(method: string, path: string, opts: { auth: Auth; json?: unk
 }
 const ok = (r: { status: number; data: any }, what: string) => {
   if (r.status >= 200 && r.status < 300) return r.data;
-  throw new DiscordError(r.status, `${what} failed (${r.status}${r.data?.message ? `: ${r.data.message}` : ''})`);
+  throw new DiscordError(r.status, `${what} failed (${r.status}${r.data?.message ? `: ${r.data.message}` : ''})`, Number(r.data?.code) || 0);
 };
 
 export interface DiscordRole { id: string; name: string; position: number; managed: boolean }
@@ -64,7 +72,8 @@ export interface DiscordRole { id: string; name: string; position: number; manag
 export interface DiscordClient {
   addRole(guildId: string, userId: string, roleId: string): Promise<void>;
   removeRole(guildId: string, userId: string, roleId: string): Promise<void>;
-  addMemberWithRole(guildId: string, userId: string, accessToken: string, roleId: string): Promise<void>;
+  /** Adds a fan to the server using their sign-in, with a role if one is given. */
+  addMember(guildId: string, userId: string, accessToken: string, roleId: string | null): Promise<void>;
   roles(guildId: string): Promise<DiscordRole[]>;
   manageableRoles(guildId: string): Promise<DiscordRole[]>;
   createRole(guildId: string, name: string): Promise<DiscordRole>;
@@ -80,11 +89,11 @@ async function botUserId(): Promise<string> {
 export const discord: DiscordClient = {
   async addRole(g, u, r) { ok(await call('PUT', `/guilds/${g}/members/${u}/roles/${r}`, { auth: { bot: true } }), 'Giving the role'); },
   async removeRole(g, u, r) { ok(await call('DELETE', `/guilds/${g}/members/${u}/roles/${r}`, { auth: { bot: true } }), 'Removing the role'); },
-  async addMemberWithRole(g, u, token, r) {
+  async addMember(g, u, token, r) {
     // 201 = added, 204 = was already in the server (the role is then given separately).
-    const res = await call('PUT', `/guilds/${g}/members/${u}`, { auth: { bot: true }, json: { access_token: token, roles: [r] } });
+    const res = await call('PUT', `/guilds/${g}/members/${u}`, { auth: { bot: true }, json: { access_token: token, ...(r ? { roles: [r] } : {}) } });
     ok(res, 'Adding the member');
-    if (res.status === 204) await discord.addRole(g, u, r);
+    if (res.status === 204 && r) await discord.addRole(g, u, r);
   },
   async roles(g) {
     const list = ok(await call('GET', `/guilds/${g}/roles`, { auth: { bot: true } }), 'Reading roles') as DiscordRole[];

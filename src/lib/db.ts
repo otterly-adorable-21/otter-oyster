@@ -130,6 +130,8 @@ function open(): DatabaseSync {
   addCol('reviewResult', "TEXT NOT NULL DEFAULT ''");
   addCol('discordGuildId', "TEXT NOT NULL DEFAULT ''");
   addCol('discordGuildName', "TEXT NOT NULL DEFAULT ''");
+  // Set when the role check finds something the creator must fix (bot kicked, role deleted). Shown in the studio.
+  addCol('discordProblem', "TEXT NOT NULL DEFAULT ''");
   const tcols = d.prepare('PRAGMA table_info(tiers)').all() as { name: string }[];
   if (!tcols.some((c) => c.name === 'discordRoleId')) d.exec("ALTER TABLE tiers ADD COLUMN discordRoleId TEXT NOT NULL DEFAULT ''");
   const wcols = d.prepare('PRAGMA table_info(webhook_events)').all() as { name: string }[];
@@ -190,7 +192,7 @@ export interface CreatorRow {
   avatarFile: string | null; avatarShape: string; dividerKind: string; dividerFile: string | null;
   logoFile: string | null; bannerStatic: string | null; avatarStatic: string | null; logoStatic: string | null;
   mascotOn: number; mascotLines: string; gankUrl: string; gankNick: string; gankVerified: number;
-  verifyCode: string; tipUrl: string; hookSecret: string; gankSigningKey: string; reviewNote: string; reviewRequestedAt: string | null; reviewResult: string; discordGuildId: string; discordGuildName: string; isExample: number; suspended: number; createdAt: string;
+  verifyCode: string; tipUrl: string; hookSecret: string; gankSigningKey: string; reviewNote: string; reviewRequestedAt: string | null; reviewResult: string; discordGuildId: string; discordGuildName: string; discordProblem: string; isExample: number; suspended: number; createdAt: string;
 }
 export interface TierRow {
   id: string; creatorId: string; position: number; name: string; price: number;

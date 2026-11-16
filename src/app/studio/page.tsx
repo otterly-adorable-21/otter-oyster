@@ -163,6 +163,7 @@ async function DiscordTab({ c, tiers, note }: { c: CreatorRow; tiers: TierRow[];
   catch { problem = 'We could not read your server. The bot may have been removed from it. Disconnect and add it again.'; }
   return (<>
     {banner}
+    {c.discordProblem && <p className="note" role="alert"><strong>Needs your attention:</strong> {c.discordProblem}</p>}
     <p>Connected server: <strong>{c.discordGuildName || 'your server'}</strong></p>
     <div style={field}><label htmlFor="dj">Your supporter Discord link</label>
       <input id="dj" readOnly value={`${appUrl()}/${c.handle}/discord`} />
@@ -180,7 +181,7 @@ async function DiscordTab({ c, tiers, note }: { c: CreatorRow; tiers: TierRow[];
             </select>
           </div>
         ))}
-        <p className="hint">A supporter gets the role for their highest tier only. Roles are checked about every half hour and removed when a plan ends. To use a role you already have, it must sit below the bot&apos;s own role in your server&apos;s role list. Roles the bot makes always work.</p>
+        <p className="hint">A supporter gets the role for their highest tier only. Roles change as soon as a payment, refund or cancellation comes in. Everything is also re-checked every half hour, which is when a role is removed after a plan runs out. To use a role you already have, it must sit below the bot&apos;s own role in your server&apos;s role list. Roles the bot makes always work.</p>
       </ActionForm>
     )}
     <details className="adv"><summary className="btn">Disconnect this server</summary>

@@ -11,7 +11,7 @@ import { sendMail } from '@/lib/email';
 import { adminEmails } from '@/lib/auth';
 import { run } from '@/lib/db';
 import { discord } from '@/lib/discord';
-import { leaveQuietly, revokeAllFor, syncCreator } from '@/lib/discord-sync';
+import { leaveQuietly, revokeAllFor, soon, syncCreator } from '@/lib/discord-sync';
 import { assignProviderRef, ensureLink, removeLink, rotateLink, savePageUrl, saveSigningKey } from '@/lib/payments/process';
 import { isProvider, PROVIDERS, type ProviderId } from '@/lib/payments/providers';
 
@@ -131,6 +131,8 @@ export async function assignTierAction(form: FormData) {
   if (tierId && ref) {
     if (provider === 'gank') assignTierRef(c.id, tierId, ref);
     else if (isProvider(provider)) assignProviderRef(c.id, provider, ref, tierId);
+    // Payments that were waiting may have just unlocked Discord roles.
+    soon('role update', () => syncCreator(c));
   }
   revalidatePath('/studio');
 }
@@ -201,8 +203,10 @@ export async function saveDiscordRolesAction(_p: Msg | null, form: FormData): Pr
   for (const [id, role] of chosen) run('UPDATE tiers SET discordRoleId = ? WHERE id = ? AND creatorId = ?', role, id, c.id);
   revalidatePath('/studio');
   // Fans who are already linked get moved to the new roles in the background.
+  // This also clears any "role was deleted" warning, so it runs before the page reloads.
   const fresh = getCreatorByUser(c.userId);
-  if (fresh) syncCreator(fresh).catch((e) => console.error('discord sync failed', e));
+  if (fresh) await syncCreator(fresh).catch((e) => console.error('discord sync failed', e));
+  revalidatePath('/studio');
   return done('Saved. Fans who connect their Discord get these roles.');
 }
 
@@ -211,7 +215,7 @@ export async function disconnectDiscordAction() {
   await leaveQuietly(c.discordGuildId);
   run("UPDATE tiers SET discordRoleId = '' WHERE creatorId = ?", c.id);
   run('DELETE FROM discord_grants WHERE creatorId = ?', c.id);
-  run("UPDATE creators SET discordGuildId = '', discordGuildName = '' WHERE id = ?", c.id);
+  run("UPDATE creators SET discordGuildId = '', discordGuildName = '', discordProblem = '' WHERE id = ?", c.id);
   revalidatePath('/studio');
 }
 

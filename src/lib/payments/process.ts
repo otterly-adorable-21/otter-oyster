@@ -109,7 +109,7 @@ export function processPaymentEvent(link: PaymentLinkRow, ev: PaymentEvent, raw:
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         newId(), provider, key, ev.eventName, '', creator?.id ?? null, ev.email, ev.tierRef, ev.months,
         outcome, note, redact(raw, ev.bodyToken), at.toISOString(), ev.tierLabel);
-      return { outcome, note };
+      return { outcome, note, creatorId: creator?.id };
     };
 
     if (!creator) return save('rejected', 'this page is suspended');

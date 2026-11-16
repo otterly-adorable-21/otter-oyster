@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { getViewer } from '@/lib/auth';
 import { get, run } from '@/lib/db';
 import type { CreatorRow } from '@/lib/db';
-import { exchangeCode, whoAmI, discord, discordConfigured } from '@/lib/discord';
-import { consumeState, syncMember } from '@/lib/discord-sync';
+import { botLostServer, exchangeCode, whoAmI, discord, discordConfigured } from '@/lib/discord';
+import { BOT_GONE, consumeState, recordProblem, syncMember, type SyncResult } from '@/lib/discord-sync';
 
 export const dynamic = 'force-dynamic';
 const appUrl = () => (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
       // A new server means the old tier roles no longer apply.
       run("UPDATE tiers SET discordRoleId = '' WHERE creatorId = ?", creator.id);
       run('DELETE FROM discord_grants WHERE creatorId = ?', creator.id);
-      run('UPDATE creators SET discordGuildId = ?, discordGuildName = ? WHERE id = ?', tok.guild.id, tok.guild.name.slice(0, 100), creator.id);
+      run("UPDATE creators SET discordGuildId = ?, discordGuildName = ?, discordProblem = '' WHERE id = ?", tok.guild.id, tok.guild.name.slice(0, 100), creator.id);
       return go('/studio?tab=discord&d=added');
     }
 
@@ -44,10 +44,15 @@ export async function GET(req: Request) {
          ON CONFLICT (userId) DO UPDATE SET discordUserId = excluded.discordUserId, username = excluded.username`,
       v.user.id, me.id, me.username.slice(0, 100), new Date().toISOString());
     const r = await syncMember(creator, v.user.id, discord, { accessToken: tok.accessToken });
-    const s = r === 'unchanged' || r === 'added' || r === 'swapped' ? 'ok' : 'nopay';
-    return go(`/discord?s=${s}&c=${creator.handle}`);
+    // Only say "you are in" when they really got their role.
+    const result: Partial<Record<SyncResult, string>> = { added: 'ok', swapped: 'ok', unchanged: 'ok', 'no-role': 'norole' };
+    return go(`/discord?s=${result[r] ?? 'nopay'}&c=${creator.handle}`);
   } catch (e) {
     console.error('discord callback failed', e instanceof Error ? e.message : e);
+    if (st.kind === 'join' && botLostServer(e)) {
+      await recordProblem(creator, BOT_GONE);
+      return go(`/discord?s=botgone&c=${creator.handle}`);
+    }
     return go(st.kind === 'install' ? '/studio?tab=discord&d=failed' : `/discord?s=error&c=${creator.handle}`);
   }
 }

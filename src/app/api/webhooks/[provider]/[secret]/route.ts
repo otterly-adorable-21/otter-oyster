@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { run } from '@/lib/db';
+import { soon, syncEmail } from '@/lib/discord-sync';
 import { bmcSignatureValid, parseFor, subscribeStarSignatureValid } from '@/lib/payments/parse';
 import { kofiTokenOk, linkBySecret, processPaymentEvent } from '@/lib/payments/process';
 import { isProvider } from '@/lib/payments/providers';
@@ -37,6 +38,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ provider: stri
 
   try {
     const r = processPaymentEvent(link, ev, raw);
+    // Give or take the Discord role now, not at the next half-hourly check.
+    if (r.outcome === 'processed' && r.creatorId && ev.email) soon('role update', () => syncEmail(r.creatorId!, ev.email));
     return NextResponse.json({ ok: true, outcome: r.outcome });
   } catch (e) {
     console.error(`${provider} webhook failed`, e);

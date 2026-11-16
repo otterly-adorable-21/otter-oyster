@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { gankSignatureValid, parseGankPayload, processGankEvent, safeEqual, signatureValid } from './gank';
+import { soon, syncEmail } from './discord-sync';
 
 const MAX_BODY = 100 * 1024;
 
@@ -28,6 +29,8 @@ export async function handleGankRequest(req: Request, opts: { forcedCreatorId?: 
 
   try {
     const r = processGankEvent(ev, raw, { forcedCreatorId: opts.forcedCreatorId });
+    // Give or take the Discord role now, not at the next half-hourly check.
+    if (r.outcome === 'processed' && r.creatorId && ev.email) soon('role update', () => syncEmail(r.creatorId!, ev.email));
     return NextResponse.json({ ok: true, outcome: r.outcome });
   } catch (e) {
     console.error('gank webhook failed', e);

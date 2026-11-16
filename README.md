@@ -14,7 +14,9 @@ npm run dev
 
 Open http://localhost:3000. With no mail server set up, sign-in links are printed in the terminal instead of emailed.
 
-## Settings (`.env`)
+## Settings
+
+On your computer they go in `.env`. **On Railway they go in the service's Variables tab** (no `.env` file is used there).
 
 | Name | What it is |
 |---|---|
@@ -25,10 +27,18 @@ Open http://localhost:3000. With no mail server set up, sign-in links are printe
 | `GANK_SIGNATURE_HEADER`, `GANK_SIGNING_SECRET` | Only if Gank signs its webhooks. Confirm with Gank. |
 | `GANK_ALLOWED_HOSTS` | Which Gank domains creators may link. Default `ganknow.com`. Confirm Gank's real domain. |
 | `ADMIN_EMAILS` | Comma-separated emails allowed into `/admin`. |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN` | Your Discord app. Optional: leave empty to hide Discord roles. See below. |
+| `DISCORD_SYNC_MINUTES` | How often all roles are re-checked. Default 30. |
 
-## Put it online
+## Put it online (Railway)
 
-Build with `npm run build`, then `npm start`. It is one Node process with a SQLite file, so any small server works. **Choose a host whose written policy allows adult content** and read it before you pay. Many do not. Keep `DATA_DIR` on storage that survives restarts.
+The site runs on Railway as one always-on Node process with a SQLite file. Railway builds it with `npm run build` and starts it with `npm start`; it needs nothing else.
+
+1. **Node version.** The database needs Node 22.5 or newer. `.nvmrc` and `engines` in `package.json` tell Railway to use Node 22. If a deploy fails with `node:sqlite` or `No such built-in module`, this is the cause.
+2. **Keep your data.** Railway wipes the disk on every deploy. Add a **Volume** to the service (right-click the service, Attach volume), mount it at `/data`, and set the variable `DATA_DIR=/data`. Without this, every deploy deletes all accounts, posts and images.
+3. **Variables.** In the service's Variables tab set at least `APP_URL=https://otteroyster.online`, `DATA_DIR=/data`, the `SMTP_*` and `MAIL_FROM` mail settings, `ADMIN_EMAILS`, and `GANK_WEBHOOK_SECRET`. Add the Discord ones when you set up Discord.
+4. **One copy only.** Keep the service at 1 replica. The database is a single file, and the Discord role check runs inside the web process.
+5. **Adult content.** Read Railway's acceptable use policy and confirm in writing that your content is allowed before you launch.
 
 ## Connect Ko-fi, Buy Me a Coffee or SubscribeStar
 
@@ -69,6 +79,27 @@ The parsers follow each platform's public docs and community examples. These doc
 
 Every message is stored in the `webhook_events` table (Ko-fi tokens are blanked out), so one real test from each platform is enough to confirm.
 
+## Discord roles
+
+Supporters get a role in the creator's own Discord server that matches their tier, and lose it when their plan ends. One shared bot serves every creator. It is not a separate program: the website itself talks to Discord, so there is nothing else to host.
+
+### Set up the bot (once, for the whole site)
+
+1. Go to https://discord.com/developers/applications and press **New Application**. Name it (for example "Otter & Oyster"). This name and icon are what creators see.
+2. **OAuth2** page: copy the **Client ID** and **Client Secret**. Under **Redirects** add exactly `https://otteroyster.online/api/discord/callback` (it must match `APP_URL`), and save.
+3. **Bot** page: press **Reset Token** and copy the token. Leave **Public Bot** switched **on**, or creators cannot add it to their servers. No privileged intents are needed.
+4. In Railway, add `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` and `DISCORD_BOT_TOKEN`, then let it redeploy.
+5. Test with your own server: Studio, Discord tab, Add the bot. If you come back to the studio with "Something went wrong adding the bot", switch on **Requires OAuth2 Code Grant** on the Bot page and try again.
+
+Keep the bot token secret. It only has Manage Roles and Create Invite, never Administrator, but anyone holding it can change roles in every connected server. If it leaks, press Reset Token and update Railway.
+
+### How it behaves
+
+- Creators: Studio, Discord tab, add the bot, then pick (or have the bot make) a role for each tier.
+- Supporters: open the creator's join link (`/handle/discord`), sign in, link Discord, and are added to the server with their role. They can unlink from the same page, which takes their roles back.
+- Roles change **as soon as** a payment, refund or cancellation arrives, when a creator matches a tier, and when a fan claims another email. Every role is also re-checked every 30 minutes; that is when roles are removed from plans that simply ran out.
+- If the bot is kicked from a server, or a tier's role is deleted, the creator sees a warning in the studio and gets one email.
+
 ## Connect Gank
 
 1. Give Gank this address and ask whether they send one webhook for the whole platform:
@@ -86,7 +117,6 @@ Every message is stored in the `webhook_events` table (Ko-fi tokens are blanked 
 
 ## Not built yet
 
-- The Discord role bot (separate always-running service).
 - Real terms, privacy policy and content rules. The pages here are placeholders. Have an adult-industry lawyer write them.
 - Backups, rate limits beyond sign-in links, and automated image moderation.
 

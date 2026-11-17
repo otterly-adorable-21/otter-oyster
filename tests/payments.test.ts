@@ -5,6 +5,7 @@ import { resetDbForTests, run, get, all, newId, nowIso, type EntitlementRow } fr
 import { parseBmc, parseKofi, parseSubscribeStar, bmcSignatureValid, subscribeStarSignatureValid } from '../src/lib/payments/parse';
 import { assignProviderRef, confirmLink, rotateLink, ensureLink, kofiTokenOk, linkBySecret, linkReady, processPaymentEvent, savePageUrl } from '../src/lib/payments/process';
 import { unmatchedPrices } from '../src/lib/creators';
+import { addMonths, paidThroughFor, signatureValid } from '../src/lib/payments/core';
 
 function seed() {
   const uid = newId(), cid = newId();
@@ -187,5 +188,22 @@ describe('page links', () => {
     run('UPDATE creators SET suspended = 1 WHERE id = ?', cid);
     const raw = kofiForm({ tier_name: 'Pearl' });
     expect(processPaymentEvent(l, parseKofi(raw)!, raw).outcome).toBe('rejected');
+  });
+});
+
+describe('shared helpers', () => {
+  it('addMonths clamps to month end', () => {
+    expect(addMonths(new Date('2026-01-31T00:00:00Z'), 1).toISOString().slice(0, 10)).toBe('2026-02-28');
+  });
+  it('a month of access includes three days of grace', () => {
+    expect(paidThroughFor(new Date('2026-03-01T00:00:00Z'), 1).toISOString().slice(0, 10)).toBe('2026-04-04');
+  });
+  it('signature check accepts hex with or without a sha256= prefix', () => {
+    const body = '{"a":1}';
+    const hex = createHmac('sha256', 's').update(body).digest('hex');
+    expect(signatureValid(body, hex, 's')).toBe(true);
+    expect(signatureValid(body, 'sha256=' + hex, 's')).toBe(true);
+    expect(signatureValid(body, hex, 'other')).toBe(false);
+    expect(signatureValid(body, null, 's')).toBe(false);
   });
 });

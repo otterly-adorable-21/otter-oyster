@@ -10,11 +10,11 @@ export function ensureExample(): void {
   const uid = newId(), cid = newId();
   const now = nowIso();
   run('INSERT INTO users (id, createdAt) VALUES (?,?)', uid, now);
-  run(`INSERT INTO creators (id,userId,handle,name,bio,mainColor,accentColor,dividerKind,mascotOn,mascotLines,gankUrl,gankNick,gankVerified,verifyCode,tipUrl,hookSecret,isExample,createdAt)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  run(`INSERT INTO creators (id,userId,handle,name,bio,mainColor,accentColor,dividerKind,mascotOn,mascotLines,verifyCode,tipUrl,hookSecret,isExample,createdAt)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     cid, uid, EXAMPLE_HANDLE, 'Otterly Adorable',
     'An otter who paints ponds, lilies and very small adventures. This is a demo page: payment buttons go nowhere real.',
-    '#00ffd5', '#ffffff', 'lily', 1, 'Thanks for stopping by!\nPond days are the best days.\nHave you seen my lilies?', 'https://example.com/', '', 0,
+    '#00ffd5', '#ffffff', 'lily', 1, 'Thanks for stopping by!\nPond days are the best days.\nHave you seen my lilies?',
     'oo-demo', '', 'demo-' + newId(), 1, now);
   const tiers: [string, number, string[]][] = [
     ['Pebble', 3, ['Behind-the-scenes sketches', 'Name in the credits']],
@@ -23,7 +23,7 @@ export function ensureExample(): void {
   ];
   const ids = tiers.map(([name, price, perks], i) => {
     const id = newId();
-    run('INSERT INTO tiers (id, creatorId, position, name, price, perks, gankUrl) VALUES (?,?,?,?,?,?,?)', id, cid, i, name, price, JSON.stringify(perks), 'https://example.com/');
+    run('INSERT INTO tiers (id, creatorId, position, name, price, perks) VALUES (?,?,?,?,?,?)', id, cid, i, name, price, JSON.stringify(perks));
     return id;
   });
   const posts: [string, string, number | null][] = [

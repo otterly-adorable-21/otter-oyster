@@ -37,10 +37,9 @@ CREATE TABLE IF NOT EXISTS creators (
   dividerKind TEXT NOT NULL DEFAULT 'line', dividerFile TEXT, logoFile TEXT,
   bannerStatic TEXT, avatarStatic TEXT, logoStatic TEXT,
   mascotOn INTEGER NOT NULL DEFAULT 0, mascotLines TEXT NOT NULL DEFAULT 'Thanks for stopping by!',
-  gankUrl TEXT NOT NULL DEFAULT '', gankNick TEXT NOT NULL DEFAULT '',
-  gankVerified INTEGER NOT NULL DEFAULT 0, verifyCode TEXT NOT NULL,
-  tipUrl TEXT NOT NULL DEFAULT '', hookSecret TEXT NOT NULL UNIQUE, gankSigningKey TEXT NOT NULL DEFAULT '',
-  reviewNote TEXT NOT NULL DEFAULT '', reviewRequestedAt TEXT, reviewResult TEXT NOT NULL DEFAULT '',
+  -- verifyCode and hookSecret are no longer used, but older databases require them, so new rows still fill them.
+  -- (Older databases also have unused columns from the removed Gank integration; they are left alone.)
+  verifyCode TEXT NOT NULL, tipUrl TEXT NOT NULL DEFAULT '', hookSecret TEXT NOT NULL UNIQUE,
   discordGuildId TEXT NOT NULL DEFAULT '', discordGuildName TEXT NOT NULL DEFAULT '',
   isExample INTEGER NOT NULL DEFAULT 0, suspended INTEGER NOT NULL DEFAULT 0,
   createdAt TEXT NOT NULL
@@ -48,8 +47,8 @@ CREATE TABLE IF NOT EXISTS creators (
 CREATE TABLE IF NOT EXISTS tiers (
   id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
   position INTEGER NOT NULL, name TEXT NOT NULL, price INTEGER NOT NULL,
-  perks TEXT NOT NULL DEFAULT '[]', gankUrl TEXT NOT NULL DEFAULT '', gankTierRef TEXT, discordRoleId TEXT NOT NULL DEFAULT '',
-  UNIQUE (creatorId, gankTierRef)
+  -- payUrl: the creator's own payment link for just this tier (optional).
+  perks TEXT NOT NULL DEFAULT '[]', payUrl TEXT NOT NULL DEFAULT '', discordRoleId TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
@@ -124,15 +123,13 @@ function open(): DatabaseSync {
   // Upgrade older databases: add columns that were introduced later.
   const cols = d.prepare('PRAGMA table_info(creators)').all() as { name: string }[];
   const addCol = (name: string, def: string) => { if (!cols.some((c) => c.name === name)) d.exec(`ALTER TABLE creators ADD COLUMN ${name} ${def}`); };
-  addCol('gankSigningKey', "TEXT NOT NULL DEFAULT ''");
-  addCol('reviewNote', "TEXT NOT NULL DEFAULT ''");
-  addCol('reviewRequestedAt', 'TEXT');
-  addCol('reviewResult', "TEXT NOT NULL DEFAULT ''");
   addCol('discordGuildId', "TEXT NOT NULL DEFAULT ''");
   addCol('discordGuildName', "TEXT NOT NULL DEFAULT ''");
   // Set when the role check finds something the creator must fix (bot kicked, role deleted). Shown in the studio.
   addCol('discordProblem', "TEXT NOT NULL DEFAULT ''");
   const tcols = d.prepare('PRAGMA table_info(tiers)').all() as { name: string }[];
+  // The per-tier payment link used to be called gankUrl.
+  if (tcols.some((c) => c.name === 'gankUrl') && !tcols.some((c) => c.name === 'payUrl')) d.exec('ALTER TABLE tiers RENAME COLUMN gankUrl TO payUrl');
   if (!tcols.some((c) => c.name === 'discordRoleId')) d.exec("ALTER TABLE tiers ADD COLUMN discordRoleId TEXT NOT NULL DEFAULT ''");
   const pcols = d.prepare('PRAGMA table_info(payment_links)').all() as { name: string }[];
   if (!pcols.some((c) => c.name === 'confirmedAt')) d.exec('ALTER TABLE payment_links ADD COLUMN confirmedAt TEXT');
@@ -193,12 +190,11 @@ export interface CreatorRow {
   mainColor: string; accentColor: string; bannerFile: string | null; bannerGrad: string;
   avatarFile: string | null; avatarShape: string; dividerKind: string; dividerFile: string | null;
   logoFile: string | null; bannerStatic: string | null; avatarStatic: string | null; logoStatic: string | null;
-  mascotOn: number; mascotLines: string; gankUrl: string; gankNick: string; gankVerified: number;
-  verifyCode: string; tipUrl: string; hookSecret: string; gankSigningKey: string; reviewNote: string; reviewRequestedAt: string | null; reviewResult: string; discordGuildId: string; discordGuildName: string; discordProblem: string; isExample: number; suspended: number; createdAt: string;
+  mascotOn: number; mascotLines: string; tipUrl: string; discordGuildId: string; discordGuildName: string; discordProblem: string; isExample: number; suspended: number; createdAt: string;
 }
 export interface TierRow {
   id: string; creatorId: string; position: number; name: string; price: number;
-  perks: string; gankUrl: string; gankTierRef: string | null; discordRoleId: string;
+  perks: string; payUrl: string; discordRoleId: string;
 }
 export interface PostRow {
   id: string; creatorId: string; tierId: string | null; title: string; body: string; nsfw: number;

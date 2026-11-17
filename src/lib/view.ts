@@ -36,17 +36,15 @@ export async function loadPage(creator: CreatorRow): Promise<PageData> {
   const tiers: TierRow[] = tiersOf(creator.id);
   const ranks = tierRanks(tiers);
   const rank = viewer ? viewerRank(creator.id, viewer.emails, ranks) : 0;
-  // Payment links are only offered once they are proven: a Gank page by review, the other platforms by a
-  // working webhook link (so a fan's payment really unlocks something). The example page is a demo.
-  const gankOk = !!creator.gankUrl && (creator.gankVerified === 1 || creator.isExample === 1);
+  // A payment site is only offered once its webhook link works, so a fan's payment really unlocks something.
+  // The example page is a demo: it shows every site, and the buttons go nowhere real.
   const links = linksOf(creator.id);
-  const payPages = [
-    ...(gankOk && safeLink(creator.gankUrl) ? [{ id: 'gank', name: 'Gank', url: creator.gankUrl }] : []),
-    ...PROVIDER_ORDER.flatMap((p) => {
+  const payPages = creator.isExample
+    ? PROVIDER_ORDER.map((p) => ({ id: p, name: PROVIDERS[p].name, url: 'https://example.com/' }))
+    : PROVIDER_ORDER.flatMap((p) => {
       const l = links.find((x) => x.provider === p);
       return l && isProvider(l.provider) && linkReady(l) && safeLink(l.pageUrl) ? [{ id: p, name: PROVIDERS[p].name, url: l.pageUrl }] : [];
-    }),
-  ];
+    });
   const canPay = payPages.length > 0;
   const byId = new Map(tiers.map((t) => [t.id, t]));
   const posts = postsOf(creator.id).map((p: PostRow): PostView => {
@@ -60,7 +58,7 @@ export async function loadPage(creator: CreatorRow): Promise<PageData> {
     creator, posts, rank, isOwner, signedIn: !!viewer, ageOk, hideNsfw, canPay, payPages,
     // Offered only to people who currently have a paid plan with this creator.
     discordJoin: !!creator.discordGuildId && rank > 0 && discordConfigured(),
-    tiers: tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, perks: perksFromJson(t.perks), ownUrl: canPay ? safeLink(t.gankUrl) : null, rank: ranks.get(t.id) ?? 0 })),
+    tiers: tiers.map((t) => ({ id: t.id, name: t.name, price: t.price, perks: perksFromJson(t.perks), ownUrl: canPay ? safeLink(t.payUrl) : null, rank: ranks.get(t.id) ?? 0 })),
     tipUrl: canPay ? safeLink(creator.tipUrl) : null,
   };
 }

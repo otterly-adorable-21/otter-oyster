@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { all, get, run, tx, newId, nowIso, type CreatorRow, type PostRow, type TierRow } from './db';
-import { clamp, httpsUrl, intInRange, MAX_TIERS, nickFromUrl, parsePerks, validHandle, validHex } from './validate';
+import { clamp, httpsUrl, intInRange, MAX_TIERS, parsePerks, validHandle, validHex } from './validate';
 
 export const getCreatorByHandle = (handle: string): CreatorRow | undefined =>
   get<CreatorRow>('SELECT * FROM creators WHERE handle = ?', handle.toLowerCase());
@@ -48,9 +48,9 @@ export function setImageField(creatorId: string, field: 'bannerFile' | 'avatarFi
   return prev;
 }
 
-export interface TierInput { id?: string; name: string; price: unknown; perks: unknown; gankUrl?: string }
+export interface TierInput { id?: string; name: string; price: unknown; perks: unknown; payUrl?: string }
 
-/** Replaces the tier list with up to 3 tiers. Existing tiers keep their id (and Gank reference) so access is not lost. */
+/** Replaces the tier list with up to 3 tiers. Existing tiers keep their id (and platform matches) so access is not lost. */
 export function saveTiers(creatorId: string, input: TierInput[]): { ok: true } | { ok: false; error: string } {
   if (input.length > MAX_TIERS) return { ok: false, error: `You can have at most ${MAX_TIERS} tiers.` };
   return tx(() => {
@@ -67,10 +67,10 @@ export function saveTiers(creatorId: string, input: TierInput[]): { ok: true } |
       const name = clamp(t.name, 40);
       if (!name || price === null) throw new Error('Each tier needs a name and a whole-dollar price.');
       const perks = JSON.stringify(parsePerks(t.perks));
-      const url = t.gankUrl ? (httpsUrl(t.gankUrl) ?? '') : '';
+      const url = t.payUrl ? (httpsUrl(t.payUrl) ?? '') : '';
       const owned = t.id && existing.find((e) => e.id === t.id);
-      if (owned) run('UPDATE tiers SET position = ?, name = ?, price = ?, perks = ?, gankUrl = ? WHERE id = ?', i, name, price, perks, url, owned.id);
-      else run('INSERT INTO tiers (id, creatorId, position, name, price, perks, gankUrl) VALUES (?,?,?,?,?,?,?)', newId(), creatorId, i, name, price, perks, url);
+      if (owned) run('UPDATE tiers SET position = ?, name = ?, price = ?, perks = ?, payUrl = ? WHERE id = ?', i, name, price, perks, url, owned.id);
+      else run('INSERT INTO tiers (id, creatorId, position, name, price, perks, payUrl) VALUES (?,?,?,?,?,?,?)', newId(), creatorId, i, name, price, perks, url);
     });
     return { ok: true as const };
   });
@@ -103,27 +103,11 @@ export function deletePost(creatorId: string, id: string): string | null {
   return cur.imageFile;
 }
 
-/** Saves the pasted Gank link. Changing it resets verification, so nobody can keep a verified badge for a page they swapped away from. */
-export function setGankLink(c: CreatorRow, urlRaw: string, tipRaw: string): { ok: true } | { ok: false; error: string } {
-  const url = urlRaw.trim() ? httpsUrl(urlRaw) : '';
-  const tip = tipRaw.trim() ? httpsUrl(tipRaw) : '';
-  if (url === null) return { ok: false, error: 'That does not look like a web link (it should start with https://).' };
-  if (tip === null) return { ok: false, error: 'The tip link is not a valid https:// link.' };
-  const nick = url ? nickFromUrl(url) : '';
-  const changed = url !== c.gankUrl;
-  run(`UPDATE creators SET gankUrl = ?, gankNick = ?, tipUrl = ?,
-    gankVerified = CASE WHEN ? THEN 0 ELSE gankVerified END,
-    reviewNote = CASE WHEN ? THEN '' ELSE reviewNote END, reviewRequestedAt = CASE WHEN ? THEN NULL ELSE reviewRequestedAt END,
-    reviewResult = CASE WHEN ? THEN '' ELSE reviewResult END WHERE id = ?`,
-    url, nick, tip, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0, c.id);
-  return { ok: true };
-}
-
-/** Marks a Gank page verified, unless some other creator already holds that name verified. */
-export function markVerified(c: CreatorRow): { ok: true } | { ok: false; error: string } {
-  const other = get('SELECT 1 FROM creators WHERE gankNick = ? AND gankVerified = 1 AND id != ?', c.gankNick, c.id);
-  if (other) return { ok: false, error: 'That Gank page is already connected to another account.' };
-  run("UPDATE creators SET gankVerified = 1, reviewResult = '' WHERE id = ?", c.id);
+/** Optional separate tip link, shown in the Support popup. Empty removes it. */
+export function setTipLink(creatorId: string, raw: string): { ok: true } | { ok: false; error: string } {
+  const tip = raw.trim() ? httpsUrl(raw.trim()) : '';
+  if (tip === null) return { ok: false, error: 'That is not a valid link. It should start with https://' };
+  run('UPDATE creators SET tipUrl = ? WHERE id = ?', tip, creatorId);
   return { ok: true };
 }
 
@@ -150,25 +134,6 @@ export function deleteAccount(userId: string): string[] {
     run('DELETE FROM users WHERE id = ?', userId);
     return files;
   });
-}
-
-/** Creator asks the site owner to check their Gank page by eye (used when the automatic check cannot see the bio). 0 = not verified, 1 = verified, 2 = waiting for review. */
-/** The creator's ticket: "my code is in my Gank bio, please check". Optional short note for the admin. */
-export function requestReview(c: CreatorRow, note: string): boolean {
-  if (!c.gankUrl || c.gankVerified !== 0) return false;
-  run("UPDATE creators SET gankVerified = 2, reviewNote = ?, reviewRequestedAt = ?, reviewResult = '' WHERE id = ?",
-    note.trim().slice(0, 500), new Date().toISOString(), c.id);
-  return true;
-}
-
-export function pendingReviews(): CreatorRow[] {
-  return all<CreatorRow>('SELECT * FROM creators WHERE gankVerified = 2 AND suspended = 0 ORDER BY reviewRequestedAt, createdAt');
-}
-
-/** Sends the ticket back with a reason the creator can read. */
-export function rejectReview(creatorId: string, reason: string): void {
-  run('UPDATE creators SET gankVerified = 0, reviewResult = ? WHERE id = ? AND gankVerified = 2',
-    reason.trim().slice(0, 500) || 'We could not see your code on that Gank page.', creatorId);
 }
 
 /** Login emails for a creator (to tell them the result of their ticket). */

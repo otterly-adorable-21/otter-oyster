@@ -75,7 +75,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
         </ActionForm>
 
         <h2>Tiers</h2>
-        <p className="hint">You start with none. Add up to 3. Leave a name empty to remove a tier. Use the same names (or the same prices) on Ko-fi, Buy Me a Coffee, SubscribeStar or Gank, and payments match your tiers by themselves.</p>
+        <p className="hint">You start with none. Add up to 3. Leave a name empty to remove a tier. Use the same names (or the same prices) on Ko-fi, Buy Me a Coffee or SubscribeStar, and payments match your tiers by themselves.</p>
         <ActionForm action={saveTiersAction} submit="Save tiers">
           {[0, 1, 2].map((i) => {
             const t = tiers[i];
@@ -85,7 +85,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
                 <div style={field}><label htmlFor={`tn${i}`}>Name</label><input id={`tn${i}`} name={`name${i}`} defaultValue={t?.name ?? ''} maxLength={40} /></div>
                 <div style={field}><label htmlFor={`tp${i}`}>Price per month (whole dollars)</label><input id={`tp${i}`} name={`price${i}`} type="number" min={1} max={10000} defaultValue={t?.price ?? ''} /></div>
                 <div style={field}><label htmlFor={`tf${i}`}>What is included (one per line)</label><textarea id={`tf${i}`} name={`perks${i}`} rows={3} defaultValue={t ? perksFromJson(t.perks).join('\n') : ''} /></div>
-                <div style={field}><label htmlFor={`tl${i}`}>Payment link for this tier (optional)</label><input id={`tl${i}`} name={`link${i}`} defaultValue={t?.gankUrl ?? ''} placeholder="https://" inputMode="url" /></div>
+                <div style={field}><label htmlFor={`tl${i}`}>Payment link for this tier (optional)</label><input id={`tl${i}`} name={`link${i}`} defaultValue={t?.payUrl ?? ''} placeholder="https://" inputMode="url" /></div>
               </fieldset>
             );
           })}
@@ -167,7 +167,7 @@ async function DiscordTab({ c, tiers, note }: { c: CreatorRow; tiers: TierRow[];
     <p>Connected server: <strong>{c.discordGuildName || 'your server'}</strong></p>
     <div style={field}><label htmlFor="dj">Your supporter Discord link</label>
       <input id="dj" readOnly value={`${appUrl()}/${c.handle}/discord`} />
-      <span className="hint">Share this instead of a normal Discord invite, for example in your membership welcome message on Ko-fi, Buy Me a Coffee, SubscribeStar or Gank. Supporters sign in, link their Discord once and are added with their role. Keep your server&apos;s own invite links private, because anyone with one can join without a role.</span></div>
+      <span className="hint">Share this instead of a normal Discord invite, for example in your membership welcome message on Ko-fi, Buy Me a Coffee or SubscribeStar. Supporters sign in, link their Discord once and are added with their role. Keep your server&apos;s own invite links private, because anyone with one can join without a role.</span></div>
     {problem && <p role="status" style={{ color: 'var(--danger)', fontWeight: 700 }}>{problem}</p>}
     {tiers.length === 0 ? <p className="hint">Add tiers on the Page tab first.</p> : (
       <ActionForm action={saveDiscordRolesAction} submit="Save roles">

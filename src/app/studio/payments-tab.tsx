@@ -2,10 +2,10 @@ import { ActionForm } from '@/components/ActionForm';
 import { unmatchedPrices } from '@/lib/creators';
 import { get, type CreatorRow, type PaymentLinkRow, type TierRow } from '@/lib/db';
 import { linkReady, linksOf } from '@/lib/payments/process';
-import { PROVIDERS, PROVIDER_ORDER, type ProviderInfo } from '@/lib/payments/providers';
+import { PROVIDERS, PROVIDER_ORDER, isProvider, type ProviderInfo } from '@/lib/payments/providers';
 import {
-  assignTierAction, confirmPayLinkAction, removePayLinkAction, requestReviewAction, rotateHookAction, rotatePayLinkAction, saveGankAction,
-  savePayPageAction, savePaySecretAction, saveSigningKeyAction, startPayAction,
+  assignTierAction, confirmPayLinkAction, removePayLinkAction, rotatePayLinkAction,
+  savePayPageAction, savePaySecretAction, saveTipAction, startPayAction,
 } from './actions';
 import { AutoRefresh, CopyField } from './copy-field';
 
@@ -21,9 +21,10 @@ const ago = (iso: string): string => {
 
 export function PaymentsTab({ c, tiers }: { c: CreatorRow; tiers: TierRow[] }) {
   const links = linksOf(c.id);
-  const waiting = unmatchedPrices(c.id);
+  // Only platforms that still exist here (older databases may hold payments from removed ones).
+  const waiting = unmatchedPrices(c.id).filter((w) => isProvider(w.provider));
   const anyWaiting = links.some((l) => !linkReady(l));
-  const nameOf = (p: string) => (p === 'gank' ? 'Gank' : PROVIDERS[p as keyof typeof PROVIDERS]?.name ?? p);
+  const nameOf = (p: string) => (isProvider(p) ? PROVIDERS[p].name : p);
 
   return (<>
     {anyWaiting && <AutoRefresh />}
@@ -49,9 +50,14 @@ export function PaymentsTab({ c, tiers }: { c: CreatorRow; tiers: TierRow[] }) {
       {PROVIDER_ORDER.map((id) => <PayCard key={id} c={c} p={PROVIDERS[id]} link={links.find((l) => l.provider === id)} />)}
     </div>
 
-    <details className="adv"><summary className="btn">Gank{c.gankVerified === 1 ? ' (connected)' : ''}</summary>
-      <div className="advin"><GankSection c={c} /></div>
-    </details>
+    <h2>Tip link (optional)</h2>
+    <ActionForm action={saveTipAction} submit="Save tip link">
+      <div style={field}>
+        <label htmlFor="tip">A separate link for one-time tips</label>
+        <input id="tip" name="tipUrl" defaultValue={c.tipUrl} placeholder="https://" inputMode="url" autoCapitalize="off" />
+        <span className="hint">Shown as “Send a one-time tip” in your Support popup. Most people can leave this empty, because fans can already tip on the sites above.</span>
+      </div>
+    </ActionForm>
   </>);
 }
 
@@ -132,56 +138,4 @@ function PayCard({ c, p, link }: { c: CreatorRow; p: ProviderInfo; link?: Paymen
       </details>
     </section>
   );
-}
-
-function GankSection({ c }: { c: CreatorRow }) {
-  return (<>
-    <p className="note">Gank takes more setup than the others: a page review by our team and a webhook registered through Gank&apos;s developer tools.</p>
-    <ol className="guide">
-      <li className="gstep"><h4>Step 1: Create your tiers on Gank</h4><p>Use the same names and prices you set on the Page tab.</p></li>
-      <li className={`gstep${c.gankUrl ? ' is-done' : ''}`}><h4>Step 2: Paste your public Gank page link below</h4></li>
-      <li className="gstep"><h4>Step 3: Put your verification code in your Gank bio</h4><p>This is how we know the page is yours.</p></li>
-      <li className={`gstep${c.gankVerified ? ' is-done' : ''}`}><h4>Step 4: Send us a review request</h4><p>A person on our team opens your Gank page, finds your code, and approves it. You get an email either way.</p></li>
-      <li className="gstep"><h4>Step 5: Match your tiers (only if asked)</h4><p>After the first payment arrives, a box at the top of this tab asks which of your tiers it belongs to.</p></li>
-    </ol>
-    <h3>1. Your Gank page</h3>
-    <ActionForm action={saveGankAction} submit="Save links">
-      <div style={field}><label htmlFor="gu">Gank page link</label><input id="gu" name="gankUrl" defaultValue={c.gankUrl} placeholder="https://" inputMode="url" autoCapitalize="off" />
-        {c.gankNick && <span className="hint">We read your Gank name as: {c.gankNick}</span>}</div>
-      <div style={field}><label htmlFor="gt">Tip link (optional)</label><input id="gt" name="tipUrl" defaultValue={c.tipUrl} placeholder="https://" inputMode="url" autoCapitalize="off" />
-        <span className="hint">The Leave a tip button goes here. If empty, it goes to your first connected payment page.</span></div>
-    </ActionForm>
-    <h3>2. Prove it is yours</h3>
-    <p>Add this code to your Gank bio or page description:</p>
-    <p><code style={{ fontSize: '1.25rem', fontWeight: 800 }}>{c.verifyCode}</code></p>
-    <p className="hint">Status: {c.gankVerified === 1 ? 'Verified' : c.gankVerified === 2 ? 'Waiting for review' : 'Not verified yet'}</p>
-    {c.gankVerified === 0 && c.reviewResult && <p role="status" style={{ color: 'var(--danger)', fontWeight: 700 }}>Not approved: {c.reviewResult} Fix it, then send a new request.</p>}
-    {c.gankVerified === 2 && <p>Request sent{c.reviewRequestedAt ? ` on ${new Date(c.reviewRequestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}. Keep your code in your Gank bio until you are approved.</p>}
-    {c.gankVerified === 1 && <p>Verified. Fans can pay from your page. If you change your Gank link you will need a new review.</p>}
-    {c.gankVerified === 0 && (
-      <ActionForm action={requestReviewAction} submit="Send review request">
-        <p className="hint">Before you send: the Gank link above is saved and the code above is in your Gank bio. {c.gankUrl ? '' : 'Save your Gank link first.'}</p>
-        <div style={field}><label htmlFor="rn">Note for our team (optional)</label><input id="rn" name="note" maxLength={500} placeholder="Anything we should know?" /></div>
-      </ActionForm>
-    )}
-    <h3>3. Connect your payments (webhook)</h3>
-    <p>This is how Gank tells the site that someone paid. <strong>Each creator connects their own Gank account.</strong> Gank has no setting that works for everyone at once.</p>
-    <p>Your private webhook address:</p>
-    <CopyField value={`${appUrl()}/api/webhooks/gank/${c.hookSecret}`} label="Gank webhook URL" />
-    <p className="hint">Keep it private. Only you and Gank should know it.</p>
-    <ol className="guide">
-      <li className="gstep"><h4>A. Register the address with Gank</h4><p>Gank only lets you do this through its Creator API, using a login token from your Gank account (see docs.ganknow.com, Creator API, Register webhook). Register that address for both events: USER_MEMBERSHIP.TX_SUCCEED and DIGITAL_GOODS.TX_SUCCEED. Gank also says digital-goods messages must be switched on by emailing support@ganknow.com.</p></li>
-      <li className="gstep"><h4>B. Copy the secret key Gank gives you back</h4><p>Gank replies with a key. Paste it below so we can check every message really came from Gank.</p></li>
-      <li className="gstep"><h4>C. Send a test</h4><p>Gank can send a test payment message to your address. A real payment is the final check.</p></li>
-    </ol>
-    <p className="hint">Careful: Gank allows only one webhook address per account. Registering this one replaces any other you had.</p>
-    <ActionForm action={saveSigningKeyAction} submit="Save key">
-      <div style={field}><label htmlFor="sk">Gank secret key {c.gankSigningKey ? '(saved, paste a new one to replace it)' : ''}</label><input id="sk" name="key" autoComplete="off" placeholder="Paste the key here" /></div>
-    </ActionForm>
-    <details className="adv"><summary className="btn">Make a new webhook address</summary>
-      <div className="advin" style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-        <p className="hint">Only do this if your address leaked. You will need to register the new one with Gank again.</p>
-        <form action={rotateHookAction}><button className="btn">Make a new address</button></form>
-      </div></details>
-  </>);
 }

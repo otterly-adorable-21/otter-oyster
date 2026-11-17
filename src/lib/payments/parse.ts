@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { safeEqual, signatureValid } from '../gank';
+import { safeEqual, signatureValid } from './core';
 import { normalizeEmail } from '../validate';
 import type { ProviderId } from './providers';
 

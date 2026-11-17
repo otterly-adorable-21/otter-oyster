@@ -2,8 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 process.env.DB_FILE = ':memory:';
 import { resetDbForTests, run, newId, nowIso, type TierRow } from '../src/lib/db';
 import { postState, tierRanks, viewerRank } from '../src/lib/access';
-import { validHandle, normalizeEmail, nickFromUrl, httpsUrl } from '../src/lib/validate';
-import { isPrivateIp, hostAllowed, verifyCodeOnPage } from '../src/lib/verify';
+import { validHandle, normalizeEmail, httpsUrl } from '../src/lib/validate';
 
 const tier = (id: string, position: number) => ({ id, position }) as TierRow;
 const base = { ranks: tierRanks([tier('a', 0), tier('b', 1)]), rank: 0, isOwner: false, ageOk: true, hideNsfw: false };
@@ -70,20 +69,6 @@ describe('validate', () => {
     expect(normalizeEmail('nope')).toBeNull();
     expect(httpsUrl('http://x.com')).toBeNull();
     expect(httpsUrl('javascript:alert(1)')).toBeNull();
-    expect(httpsUrl('https://ganknow.com/otterly')).toBeTruthy();
-    expect(nickFromUrl('https://ganknow.com/Otterly/')).toBe('otterly');
-  });
-});
-
-describe('verify', () => {
-  it('blocks private addresses and unlisted hosts', () => {
-    for (const ip of ['127.0.0.1', '10.0.0.5', '192.168.1.1', '169.254.169.254', '::1', '172.16.0.1']) expect(isPrivateIp(ip)).toBe(true);
-    expect(isPrivateIp('8.8.8.8')).toBe(false);
-    expect(hostAllowed('evil.com', ['ganknow.com'])).toBe(false);
-    expect(hostAllowed('ganknow.com', ['ganknow.com'])).toBe(true);
-  });
-  it('rejects a non-allowed host before any request', async () => {
-    const r = await verifyCodeOnPage('https://evil.example.org/x', 'code');
-    expect(r.ok).toBe(false);
+    expect(httpsUrl('https://ko-fi.com/otterly')).toBeTruthy();
   });
 });

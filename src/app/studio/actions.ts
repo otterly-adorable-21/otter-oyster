@@ -2,13 +2,10 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { endSession, getViewer } from '@/lib/auth';
-import { assignTierRef } from '@/lib/gank';
 import {
-  createCreator, deleteAccount, deletePost, getCreatorByUser, tiersOf, markVerified, requestReview, saveTiers, savePost, setGankLink, setImageField, updateProfile, type TierInput,
+  createCreator, deleteAccount, deletePost, getCreatorByUser, tiersOf, saveTiers, savePost, setImageField, setTipLink, updateProfile, type TierInput,
 } from '@/lib/creators';
 import { deleteImage, ImageError, saveImage, type ImageKind } from '@/lib/images';
-import { sendMail } from '@/lib/email';
-import { adminEmails } from '@/lib/auth';
 import { run } from '@/lib/db';
 import { discord } from '@/lib/discord';
 import { leaveQuietly, revokeAllFor, soon, syncCreator } from '@/lib/discord-sync';
@@ -77,7 +74,7 @@ export async function saveTiersAction(_p: Msg | null, form: FormData): Promise<M
   for (let i = 0; i < 3; i++) {
     const name = String(form.get(`name${i}`) || '').trim();
     if (!name) continue;
-    tiers.push({ id: String(form.get(`id${i}`) || '') || undefined, name, price: form.get(`price${i}`), perks: String(form.get(`perks${i}`) || ''), gankUrl: String(form.get(`link${i}`) || '') });
+    tiers.push({ id: String(form.get(`id${i}`) || '') || undefined, name, price: form.get(`price${i}`), perks: String(form.get(`perks${i}`) || ''), payUrl: String(form.get(`link${i}`) || '') });
   }
   try {
     const r = saveTiers(c.id, tiers);
@@ -116,34 +113,25 @@ export async function deletePostAction(form: FormData) {
   revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
 }
 
-export async function saveGankAction(_p: Msg | null, form: FormData): Promise<Msg> {
+export async function saveTipAction(_p: Msg | null, form: FormData): Promise<Msg> {
   const c = await mine();
-  const r = setGankLink(c, String(form.get('gankUrl') || ''), String(form.get('tipUrl') || ''));
+  const r = setTipLink(c.id, String(form.get('tipUrl') || ''));
   if (!r.ok) return fail(r.error);
-  revalidatePath('/studio');
-  return done('Saved. If you changed the page link, check it again below.');
+  revalidatePath('/studio'); revalidatePath(`/${c.handle}`);
+  return done('Saved.');
 }
 
 export async function assignTierAction(form: FormData) {
   const c = await mine();
   const tierId = String(form.get('tierId') || ''), ref = String(form.get('priceRef') || '');
-  const provider = String(form.get('provider') || 'gank');
-  if (tierId && ref) {
-    if (provider === 'gank') assignTierRef(c.id, tierId, ref);
-    else if (isProvider(provider)) assignProviderRef(c.id, provider, ref, tierId);
+  const provider = String(form.get('provider') || '');
+  if (tierId && ref && isProvider(provider)) {
+    assignProviderRef(c.id, provider, ref, tierId);
     // Payments that were waiting may have just unlocked Discord roles.
     soon('role update', () => syncCreator(c));
   }
   revalidatePath('/studio');
 }
-
-export async function rotateHookAction() {
-  const c = await mine();
-  const { randomBytes } = await import('node:crypto');
-  run('UPDATE creators SET hookSecret = ? WHERE id = ?', randomBytes(24).toString('hex'), c.id);
-  revalidatePath('/studio');
-}
-
 
 export async function deleteAccountAction(_p: Msg | null, form: FormData): Promise<Msg> {
   const { v, creator } = await me();
@@ -157,30 +145,6 @@ export async function deleteAccountAction(_p: Msg | null, form: FormData): Promi
   for (const f of files) await deleteImage(f);
   await endSession();
   redirect('/');
-}
-
-export async function requestReviewAction(_p: Msg | null, form: FormData): Promise<Msg> {
-  const c = await mine();
-  if (!c.gankUrl) return fail('Save your Gank page link first.');
-  if (!requestReview(c, String(form.get('note') || ''))) return fail('Your page is already verified or waiting for review.');
-  // Tell the admins there is a ticket. Best effort: the ticket is saved even if the email fails.
-  const site = (process.env.APP_URL || '').replace(/\/$/, '');
-  for (const to of adminEmails()) {
-    sendMail(to, `Gank page waiting for review: @${c.handle}`,
-      `@${c.handle} asked for a review.\n\nGank page: ${c.gankUrl}\nCode to find in their bio: ${c.verifyCode}\n\nReview it here: ${site}/admin`)
-      .catch((e) => console.error('admin notice failed', e));
-  }
-  revalidatePath('/studio');
-  return done('Sent. We will check your Gank bio for your code. Keep the code there until you hear back.');
-}
-
-export async function saveSigningKeyAction(_p: Msg | null, form: FormData): Promise<Msg> {
-  const c = await mine();
-  const key = String(form.get('key') || '').trim();
-  if (key.length > 300 || /\s/.test(key)) return fail('That does not look like a signing key. It is one long string with no spaces.');
-  run('UPDATE creators SET gankSigningKey = ? WHERE id = ?', key, c.id);
-  revalidatePath('/studio');
-  return done(key ? 'Saved. Payment messages are now checked against this key.' : 'Key removed.');
 }
 
 export async function saveDiscordRolesAction(_p: Msg | null, form: FormData): Promise<Msg> {

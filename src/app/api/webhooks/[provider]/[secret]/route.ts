@@ -10,7 +10,6 @@ const MAX_BODY = 100 * 1024;
 const no = (status: number) => NextResponse.json({ ok: false }, { status });
 
 // One private address per creator per platform: /api/webhooks/kofi/<secret>, /bmc/<secret>, /subscribestar/<secret>.
-// (Gank keeps its own route at /api/webhooks/gank.)
 export async function POST(req: Request, ctx: { params: Promise<{ provider: string; secret: string }> }) {
   const { provider, secret } = await ctx.params;
   if (!isProvider(provider)) return no(404);

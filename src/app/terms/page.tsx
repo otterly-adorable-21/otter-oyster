@@ -12,7 +12,7 @@ export default function Terms() {
       <p>These terms are an agreement between you and the operator of {SITE_NAME} (&quot;we&quot;, &quot;us&quot;). By using the site, you agree to them and to our <Link href="/rules">Content rules</Link>. If you do not agree, please do not use the site.</p>
 
       <h2>1. What the site is</h2>
-      <p>{SITE_NAME} lets creators make a page, publish posts, set up membership tiers, and link to a payment service (Gank) where supporters pay. We host pages and posts and unlock them for supporters. <strong>We do not take or process payments.</strong> Payments, refunds, taxes and payouts are handled by Gank under Gank&apos;s own terms.</p>
+      <p>{SITE_NAME} lets creators make a page, publish posts, set up membership tiers, and link to payment services (such as Ko-fi, Buy Me a Coffee or SubscribeStar) where supporters pay. We host pages and posts and unlock them for supporters. <strong>We do not take or process payments.</strong> Payments, refunds, taxes and payouts are handled by those services under their own terms.</p>
 
       <h2>2. Who can use it</h2>
       <ul>
@@ -30,20 +30,20 @@ export default function Terms() {
       </ul>
 
       <h2>4. Supporters and access</h2>
-      <p>Access to locked posts is based on the email address used for a payment on Gank. You sign in here with the same email, or link a second email on a creator&apos;s page. Access can take a short time to appear after you pay. A tier&apos;s access may end after cancellation, a refund or a payment problem. Because payments happen on Gank, questions about charges and refunds go to Gank and the creator, not to us.</p>
+      <p>Access to locked posts is based on the email address used for a payment on the creator&apos;s payment service. You sign in here with the same email, or link a second email on a creator&apos;s page. Access can take a short time to appear after you pay. A tier&apos;s access may end after cancellation, a refund or a payment problem. Because payments happen on those services, questions about charges and refunds go to the payment service and the creator, not to us.</p>
 
       <h2>5. What we can do</h2>
       <p>We may remove or hide content, suspend a page, or close an account if it breaks these terms or the Content rules, if the law requires it, or if it puts people at risk. We may change or stop parts of the site. We try to give notice where we can, but we may act right away in serious cases.</p>
 
       <h2>6. Deleting your account</h2>
-      <p>Creators can delete their account in the studio. This permanently removes the page, tiers, posts, uploaded images and sign-in. The payment notices we stored for your page are deleted too. Gank keeps its own payment records under its own terms.</p>
+      <p>Creators can delete their account in the studio. This permanently removes the page, tiers, posts, uploaded images and sign-in. The payment notices we stored for your page are deleted too. Payment services keep their own payment records under their own terms.</p>
 
       <h2>7. Copyright complaints</h2>
       <p>If you believe something on the site copies your work without permission, send us a report through the <Link href="/report">report form</Link>{CONTACT_EMAIL ? <> or at {CONTACT_EMAIL}</> : null}. Include what was copied, where it appears, and how to reach you. We may remove the content and tell the person who posted it.</p>
 
       <h2>8. Privacy</h2>
       <ul>
-        <li><strong>What we collect:</strong> your email address, a sign-in session (a cookie), the content you upload, and, for creators, the page details you enter. We store the payment notices Gank sends us (the supporter&apos;s email, the creator and tier, dates, and the rest of the notice), so we can unlock the right posts. If you send a report, we store it, along with your email if you give one.</li>
+        <li><strong>What we collect:</strong> your email address, a sign-in session (a cookie), the content you upload, and, for creators, the page details you enter. We store the payment notices the payment services send us (the supporter&apos;s email, the creator and tier, dates, and the rest of the notice), so we can unlock the right posts. If you send a report, we store it, along with your email if you give one.</li>
         <li><strong>Cookies:</strong> we use a sign-in cookie and small cookies that remember your age confirmation and your &quot;hide 18+ posts&quot; choice. We do not use advertising cookies.</li>
         <li><strong>What we do with it:</strong> run the site, unlock posts, send sign-in emails, prevent abuse, and answer reports. We do not sell your information.</li>
         <li><strong>Who sees it:</strong> email delivery and hosting services that help us run the site, and authorities when the law requires it. Creators do not see their supporters&apos; email addresses through this site.</li>

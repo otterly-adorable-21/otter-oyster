@@ -1,6 +1,6 @@
 # Otter & Oyster
 
-Creator pages with tiers, gated posts, tips and an 18+ gate. Fans pay on Ko-fi, Buy Me a Coffee, SubscribeStar or Gank, sign in here with the same email, and their posts unlock.
+Creator pages with tiers, gated posts, tips and an 18+ gate. Fans pay on Ko-fi, Buy Me a Coffee or SubscribeStar, sign in here with the same email, and their posts unlock.
 
 ## Run it on your computer
 
@@ -23,9 +23,6 @@ On your computer they go in `.env`. **On Railway they go in the service's Variab
 | `APP_URL` | Your public address, e.g. `https://yoursite.com`. Used in sign-in links. |
 | `DATA_DIR` | Folder for the database and uploaded images. Back this up. |
 | `SMTP_*`, `MAIL_FROM` | Your email sender, so sign-in links can be mailed. |
-| `GANK_WEBHOOK_SECRET` | A long random string. Part of the address you give Gank. |
-| `GANK_SIGNATURE_HEADER`, `GANK_SIGNING_SECRET` | Only if Gank signs its webhooks. Confirm with Gank. |
-| `GANK_ALLOWED_HOSTS` | Which Gank domains creators may link. Default `ganknow.com`. Confirm Gank's real domain. |
 | `ADMIN_EMAILS` | Comma-separated emails allowed into `/admin`. |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN` | Your Discord app. Optional: leave empty to hide Discord roles. See below. |
 | `DISCORD_SYNC_MINUTES` | How often all roles are re-checked. Default 30. |
@@ -36,7 +33,7 @@ The site runs on Railway as one always-on Node process with a SQLite file. Railw
 
 1. **Node version.** The database needs Node 22.5 or newer. `.nvmrc` and `engines` in `package.json` tell Railway to use Node 22. If a deploy fails with `node:sqlite` or `No such built-in module`, this is the cause.
 2. **Keep your data.** Railway wipes the disk on every deploy. Add a **Volume** to the service (right-click the service, Attach volume), mount it at `/data`, and set the variable `DATA_DIR=/data`. Without this, every deploy deletes all accounts, posts and images.
-3. **Variables.** In the service's Variables tab set at least `APP_URL=https://otteroyster.online`, `DATA_DIR=/data`, the `SMTP_*` and `MAIL_FROM` mail settings, `ADMIN_EMAILS`, and `GANK_WEBHOOK_SECRET`. Add the Discord ones when you set up Discord.
+3. **Variables.** In the service's Variables tab set at least `APP_URL=https://otteroyster.online`, `DATA_DIR=/data`, the `SMTP_*` and `MAIL_FROM` mail settings, and `ADMIN_EMAILS`. Add the Discord ones when you set up Discord.
 4. **One copy only.** Keep the service at 1 replica. The database is a single file, and the Discord role check runs inside the web process.
 5. **Adult content.** Read Railway's acceptable use policy and confirm in writing that your content is allowed before you launch.
 
@@ -101,20 +98,9 @@ Keep the bot token secret. It only has Manage Roles and Create Invite, never Adm
 - Roles change **as soon as** a payment, refund or cancellation arrives, when a creator matches a tier, and when a fan claims another email. Every role is also re-checked every 30 minutes; that is when roles are removed from plans that simply ran out.
 - If the bot is kicked from a server, or a tier's role is deleted, the creator sees a warning in the studio and gets one email.
 
-## Connect Gank
+## Payments are handled by the platforms
 
-1. Give Gank this address and ask whether they send one webhook for the whole platform:
-   `https://YOUR-SITE/api/webhooks/gank?key=YOUR_GANK_WEBHOOK_SECRET`
-2. Each creator can also use their own private address, shown under Studio, Payments, Advanced.
-3. Creators paste their Gank page link, put the code shown in the studio into their Gank bio, and press Check. This proves the page is theirs.
-4. The first payment for a tier may ask the creator to match it to one of their tiers. After that it is automatic.
-
-## Things I could not confirm (look for `VERIFY` in `src/lib/gank.ts` and `src/lib/validate.ts`)
-
-- Gank's webhook names for refunds, chargebacks and cancellations are guesses.
-- How Gank builds page links, so how we read the creator name from one.
-- Whether a server can read the Gank bio. If the page is drawn by JavaScript, the check cannot see the code, and you will need another proof method (for example Gank confirming ownership).
-- Whether Gank allows this use. Get their answer in writing.
+Each payment platform's own terms decide what can be sold there, including adult content. Before launch, get each platform's answer in writing that this use (and your content) is allowed.
 
 ## Not built yet
 
@@ -123,4 +109,4 @@ Keep the bot token secret. It only has Manage Roles and Create Invite, never Adm
 
 ## Tests
 
-`npm test` runs the payment logic (Gank, Ko-fi, Buy Me a Coffee, SubscribeStar), access rules and input checks. `npm run typecheck` checks types.
+`npm test` runs the payment logic (Ko-fi, Buy Me a Coffee, SubscribeStar), access rules and input checks. `npm run typecheck` checks types.

@@ -14,7 +14,7 @@ export default async function Claim({ params }: { params: Promise<{ handle: stri
   return (
     <div className="wrap" style={{ maxWidth: 560, margin: '32px auto', padding: '0 16px', display: 'grid', gap: 16 }}>
       <h1>Claim your access to {c.name}</h1>
-      <p>If you paid on Gank with a different email than the one you sign in with, add that email here. We will send a confirmation link to it. Once confirmed, your posts unlock.</p>
+      <p>If you paid with a different email than the one you sign in with, add that email here. We will send a confirmation link to it. Once confirmed, your posts unlock.</p>
       {v ? <ClaimForm handle={c.handle} /> : <p><Link className="btn btn-brand" href={`/login?next=/${c.handle}/claim`}>Sign in first</Link></p>}
       <p><Link href={`/${c.handle}`}>Back to the page</Link></p>
     </div>

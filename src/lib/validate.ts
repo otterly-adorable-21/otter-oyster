@@ -41,16 +41,6 @@ export function httpsUrl(raw: unknown): string | null {
   }
 }
 
-/** The Gank name is the last part of the page link path (VERIFY against Gank's real link format). */
-export function nickFromUrl(url: string): string {
-  try {
-    const seg = new URL(url).pathname.split('/').filter(Boolean);
-    return (seg[seg.length - 1] || '').replace(/^@/, '').toLowerCase().slice(0, 60);
-  } catch {
-    return '';
-  }
-}
-
 export function parsePerks(raw: unknown): string[] {
   return String(raw ?? '')
     .split('\n')

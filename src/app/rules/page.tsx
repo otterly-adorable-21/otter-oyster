@@ -42,7 +42,7 @@ export default function Rules() {
       </ul>
 
       <h2>5. Money</h2>
-      <p>Payments happen on Gank, not on {SITE_NAME}. Your content must also follow the rules of the payment service you use. If that service closes your account or refuses a payment, {SITE_NAME} cannot overrule it. Do not use your page to move money in ways that break the law.</p>
+      <p>Payments happen on the payment service you connect (such as Ko-fi, Buy Me a Coffee or SubscribeStar), not on {SITE_NAME}. Your content must also follow the rules of the payment service you use. If that service closes your account or refuses a payment, {SITE_NAME} cannot overrule it. Do not use your page to move money in ways that break the law.</p>
 
       <h2>6. Reporting and enforcement</h2>
       <p>Anyone can report a page or post using the <Link href="/report">report form</Link>{CONTACT_EMAIL ? <> or by writing to {CONTACT_EMAIL}</> : null}. Reports involving minors or non-consensual content are handled first.</p>

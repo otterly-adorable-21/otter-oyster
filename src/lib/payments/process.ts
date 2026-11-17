@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { all, get, run, tx, newId, nowIso, type CreatorRow, type PaymentLinkRow, type TierRow, type WebhookEventRow } from '../db';
-import { grant, safeEqual, type Outcome, type ProcessResult } from '../gank';
+import { grant, safeEqual, type Outcome, type ProcessResult } from './core';
 import { httpsUrl } from '../validate';
 import { PROVIDERS, pageHostOk, type ProviderId } from './providers';
 import type { PaymentEvent } from './parse';
